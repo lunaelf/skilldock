@@ -2,7 +2,7 @@
 
 > 本文件由 `scripts/store/gen-packages.sh` 从 `skills-lock.json` 生成，请勿手动编辑。
 
-共 5 个 package。
+共 4 个 package。
 
 ## blader/humanizer
 
@@ -35,12 +35,6 @@
   - `triage`
   - `wayfinder`
   - `writing-great-skills`
-
-## microsoft/playwright-cli
-
-- 来源类型：github
-- skill（1 个）：
-  - `playwright-cli`
 
 ## op7418/Humanizer-zh
 
