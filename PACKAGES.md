@@ -13,7 +13,7 @@
 ## mattpocock/skills
 
 - 来源类型：github
-- skill（21 个）：
+- skill（22 个）：
   - `ask-matt`
   - `code-review`
   - `codebase-design`
@@ -27,6 +27,7 @@
   - `improve-codebase-architecture`
   - `prototype`
   - `research`
+  - `resolving-merge-conflicts`
   - `setup-matt-pocock-skills`
   - `tdd`
   - `teach`
