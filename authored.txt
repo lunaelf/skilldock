@@ -3,4 +3,3 @@
 # 用 scripts/mark-authored.sh <name> 维护，doctor.sh / gen-packages.sh 会读取。
 # 以 # 开头的行和空行会被忽略。
 git-commit
-spring-boot-cicd

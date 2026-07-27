@@ -49,12 +49,11 @@
 - skill（1 个）：
   - `find-skills`
 
-## 自己写的 skill（2 个）
+## 自己写的 skill（1 个）
 
 - 不来自 package，由本仓库维护。
 
   - `git-commit`
-  - `spring-boot-cicd`
 
 ## 外部 GitHub skill（2 个）
 
