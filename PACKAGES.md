@@ -56,8 +56,9 @@
   - `git-commit`
   - `spring-boot-cicd`
 
-## 外部 GitHub skill（1 个）
+## 外部 GitHub skill（2 个）
 
 - 来自 GitHub 仓库（非 npx），符号链接进来；用 scripts/store/sync-external.sh 还原/更新。
 
   - `hv-analysis` — https://github.com/KKKKhazix/khazix-skills.git（`hv-analysis`）
+  - `todoist-cli` — https://github.com/Doist/todoist-cli.git（`skills/todoist-cli`）

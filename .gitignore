@@ -30,3 +30,4 @@ yarn-error.log*
 
 # External skill symlinks (restore via scripts/store/sync-external.sh)
 /.agents/skills/hv-analysis
+/.agents/skills/todoist-cli

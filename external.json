@@ -5,6 +5,11 @@
       "repo": "https://github.com/KKKKhazix/khazix-skills.git",
       "ref": "",
       "skillPath": "hv-analysis"
+    },
+    "todoist-cli": {
+      "repo": "https://github.com/Doist/todoist-cli.git",
+      "ref": "",
+      "skillPath": "skills/todoist-cli"
     }
   }
 }
