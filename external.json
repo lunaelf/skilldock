@@ -10,11 +10,6 @@
       "repo": "https://github.com/Doist/todoist-cli.git",
       "ref": "",
       "skillPath": "skills/todoist-cli"
-    },
-    "dashi-ppt": {
-      "repo": "https://github.com/chuspeeism/dashi-ppt-skill.git",
-      "ref": "",
-      "skillPath": "skills/dashi-ppt"
     }
   }
 }
