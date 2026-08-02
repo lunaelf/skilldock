@@ -122,6 +122,11 @@ enum Command {
         /// The skill name (a single directory-name component).
         name: String,
     },
+    /// Bootstrap a fresh Skilldock: clone the data repo, write config, and sync.
+    Init {
+        /// Git URL of the data repo to clone into `~/.skilldock/store`.
+        url: String,
+    },
 }
 
 /// Parse arguments and run the selected command.
@@ -161,7 +166,18 @@ pub fn run() -> Result<()> {
         Command::Register { consumers, remove } => run_register(&sd, &consumers, remove)?,
         Command::List { json } => run_list(&sd, json)?,
         Command::Author { name } => run_author(&sd, &name)?,
+        Command::Init { url } => run_init(&sd, &url)?,
     }
+    Ok(())
+}
+
+fn run_init(sd: &Skilldock, url: &str) -> Result<()> {
+    let outcome = core::init(sd, url)?;
+    println!(
+        "initialized {} ({} repo(s) synced)",
+        outcome.store.display(),
+        outcome.synced.cloned.len()
+    );
     Ok(())
 }
 

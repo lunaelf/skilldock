@@ -6,6 +6,7 @@
 //! against a throwaway root under test.
 
 mod cache;
+mod config;
 mod consumer;
 mod error;
 mod expand;
@@ -24,6 +25,7 @@ mod source;
 mod tomlio;
 mod vendored;
 
+pub use config::Config;
 pub use consumer::Consumer;
 pub use error::{Error, Result};
 pub use glob::is_glob;
@@ -36,6 +38,7 @@ pub use source::{parse_source, Source};
 pub use ops::add::{add, AddOutcome, AddRequest};
 pub use ops::author::{author, AuthorOutcome};
 pub use ops::doctor::{doctor, DoctorOptions, Finding, FindingKind, Report, Severity};
+pub use ops::init::{init, InitOutcome};
 pub use ops::link::{link, LinkOutcome};
 pub use ops::list::{list, AuthoredSkill, Listing, VendoredSkill};
 pub use ops::prune::{prune, PruneOutcome};

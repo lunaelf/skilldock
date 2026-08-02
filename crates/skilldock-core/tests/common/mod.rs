@@ -22,9 +22,16 @@ pub struct TempSkilldock {
 impl TempSkilldock {
     /// Create a fresh skilldock with `store/skills` and `cache/` in place.
     pub fn new() -> Self {
+        let sd = Self::empty();
+        sd.sd.ensure_layout().expect("ensure skilldock layout");
+        sd
+    }
+
+    /// A skilldock whose root exists but is otherwise empty (no layout) — for
+    /// `init`, which clones into an empty `store/`.
+    pub fn empty() -> Self {
         let tmp = TempDir::new().expect("create tempdir");
         let sd = Skilldock::at(tmp.path());
-        sd.ensure_layout().expect("ensure skilldock layout");
         TempSkilldock { _tmp: tmp, sd }
     }
 
@@ -66,9 +73,17 @@ impl GitFixture {
     /// Write a skill with the given `SKILL.md` body at `subpath` (relative to
     /// the repo root). Parent directories are created.
     pub fn add_skill(&self, subpath: &str, skill_md: &str) -> &Self {
-        let dir = self.path.join(subpath);
-        std::fs::create_dir_all(&dir).expect("create skill dir");
-        std::fs::write(dir.join("SKILL.md"), skill_md).expect("write SKILL.md");
+        self.write_file(&format!("{subpath}/SKILL.md"), skill_md)
+    }
+
+    /// Write an arbitrary file at `rel` (relative to the repo root), creating
+    /// parent directories. For building non-skill fixtures (manifests, etc.).
+    pub fn write_file(&self, rel: &str, content: &str) -> &Self {
+        let path = self.path.join(rel);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).expect("create parent dir");
+        }
+        std::fs::write(path, content).expect("write file");
         self
     }
 

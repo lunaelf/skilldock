@@ -5,6 +5,7 @@
 pub mod add;
 pub mod author;
 pub mod doctor;
+pub mod init;
 pub mod link;
 pub mod list;
 pub mod prune;
