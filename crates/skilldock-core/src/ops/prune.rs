@@ -1,9 +1,12 @@
+use std::path::PathBuf;
+
 use serde::Serialize;
 
 use crate::consumer::Consumer;
 use crate::error::{Error, Result};
 use crate::linkfs;
 use crate::linking;
+use crate::registry;
 use crate::skilldock::Skilldock;
 
 /// What `prune` did.
@@ -50,4 +53,21 @@ pub fn prune(sd: &Skilldock, consumer: &Consumer) -> Result<PruneOutcome> {
     outcome.pruned.dedup();
     outcome.deregistered = linking::cleanup_project_if_empty(sd, consumer)?;
     Ok(outcome)
+}
+
+/// Prune dangling links from every registered project Consumer — the
+/// cross-`links.txt` batch form of [`prune`], used by `doctor --fix`. A project
+/// emptied by pruning is deregistered (via [`prune`]); registered projects whose
+/// directory is gone are skipped (doctor reports those separately).
+pub fn prune_all(sd: &Skilldock) -> Result<Vec<(PathBuf, PruneOutcome)>> {
+    let mut out = Vec::new();
+    // `registry::read` snapshots the list, so deregistering emptied projects
+    // mid-iteration is safe.
+    for dir in registry::read(sd)? {
+        if dir.is_dir() {
+            let outcome = prune(sd, &Consumer::Project(dir.clone()))?;
+            out.push((dir, outcome));
+        }
+    }
+    Ok(out)
 }

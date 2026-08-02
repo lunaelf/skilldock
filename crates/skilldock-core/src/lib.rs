@@ -41,9 +41,10 @@ pub use ops::doctor::{doctor, DoctorOptions, Finding, FindingKind, Report, Sever
 pub use ops::init::{init, InitOutcome};
 pub use ops::link::{link, LinkOutcome};
 pub use ops::list::{list, AuthoredSkill, Listing, VendoredSkill};
-pub use ops::prune::{prune, PruneOutcome};
+pub use ops::migrate::{migrate, MigrateOptions, MigrateOutcome, SkillReport, SkillStatus};
+pub use ops::prune::{prune, prune_all, PruneOutcome};
 pub use ops::register::{deregister, register};
-pub use ops::relink::{relink, RelinkOutcome};
+pub use ops::relink::{relink, relink_all, RelinkOutcome};
 pub use ops::remove::{remove, RemoveOutcome};
 pub use ops::sync::{sync, SyncOutcome};
 pub use ops::unlink::{unlink, UnlinkOutcome};

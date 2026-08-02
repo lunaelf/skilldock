@@ -52,7 +52,9 @@ fn resolve_exact(
             "declared skill '{rel}' has no SKILL.md in the source"
         )));
     }
-    let name = rename.map(str::to_string).unwrap_or_else(|| basename(&rel));
+    let name = rename
+        .map(str::to_string)
+        .unwrap_or_else(|| basename(&rel).to_string());
     let hash = hash_dir(&dir)?;
     Ok((
         rel.clone(),
@@ -89,7 +91,7 @@ fn expand_glob(
         out.insert(
             rel.clone(),
             LockSkill {
-                name: basename(&rel),
+                name: basename(&rel).to_string(),
                 path: rel,
                 hash,
             },
@@ -110,9 +112,10 @@ fn normalize(subpath: &str) -> String {
     subpath.trim_matches('/').to_string()
 }
 
-/// The last path component — the default skill name.
-fn basename(rel: &str) -> String {
-    rel.rsplit('/').next().unwrap_or(rel).to_string()
+/// The last path component — a skill's default name. Shared with `migrate`,
+/// which classifies whether an old entry's basename already yields its name.
+pub(crate) fn basename(path: &str) -> &str {
+    path.trim_matches('/').rsplit('/').next().unwrap_or(path)
 }
 
 #[cfg(test)]

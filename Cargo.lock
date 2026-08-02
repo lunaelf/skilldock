@@ -2896,6 +2896,7 @@ dependencies = [
  "dirs 5.0.1",
  "glob",
  "serde",
+ "serde_json",
  "sha2",
  "specta",
  "tempfile",

@@ -9,7 +9,8 @@ use std::path::Path;
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 use skilldock_core::{
-    self as core, AddRequest, Consumer, DoctorOptions, Severity, SkillSpec, Skilldock,
+    self as core, AddRequest, Consumer, DoctorOptions, MigrateOptions, Severity, SkillSpec,
+    SkillStatus, Skilldock,
 };
 
 #[derive(Parser)]
@@ -73,19 +74,25 @@ enum Command {
     },
     /// Remove dangling (broken) links from a Consumer.
     Prune {
-        /// The project path; omit with `-g`.
+        /// The project path; omit with `-g` or `--all`.
         consumer: Option<String>,
         /// Operate on the global links.
         #[arg(short, long)]
         global: bool,
+        /// Prune every registered project in `links.txt`.
+        #[arg(long, conflicts_with_all = ["global", "consumer"])]
+        all: bool,
     },
     /// Re-point a Consumer's links to their current Source paths.
     Relink {
-        /// The project path; omit with `-g`.
+        /// The project path; omit with `-g` or `--all`.
         consumer: Option<String>,
         /// Operate on the global links.
         #[arg(short, long)]
         global: bool,
+        /// Re-point every registered project in `links.txt`.
+        #[arg(long, conflicts_with_all = ["global", "consumer"])]
+        all: bool,
     },
     /// Cross-check the dock's integrity; errors exit non-zero.
     Doctor {
@@ -127,6 +134,21 @@ enum Command {
         /// Git URL of the data repo to clone into `~/.skilldock/store`.
         url: String,
     },
+    /// Convert the Bash-era three-manifest repo into the new dock (one-shot).
+    Migrate {
+        /// Path to the old repo holding `skills-lock.json` / `authored.txt` /
+        /// `external.json`.
+        old_repo: String,
+        /// Compute and print the full plan without writing anything.
+        #[arg(long)]
+        dry_run: bool,
+        /// After the built dock passes doctor, remove the old manifest files.
+        #[arg(long)]
+        cleanup: bool,
+        /// Emit the outcome as structured JSON.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 /// Parse arguments and run the selected command.
@@ -155,8 +177,29 @@ pub fn run() -> Result<()> {
             let (consumer, skills) = split_consumer_args(global, args)?;
             run_unlink(&sd, consumer, &skills)?
         }
-        Command::Prune { consumer, global } => run_prune(&sd, make_consumer(global, consumer)?)?,
-        Command::Relink { consumer, global } => run_relink(&sd, make_consumer(global, consumer)?)?,
+        // clap's `conflicts_with_all` guarantees `--all` is exclusive of a path/`-g`.
+        Command::Prune {
+            consumer,
+            global,
+            all,
+        } => {
+            if all {
+                run_prune_all(&sd)?
+            } else {
+                run_prune(&sd, make_consumer(global, consumer)?)?
+            }
+        }
+        Command::Relink {
+            consumer,
+            global,
+            all,
+        } => {
+            if all {
+                run_relink_all(&sd)?
+            } else {
+                run_relink(&sd, make_consumer(global, consumer)?)?
+            }
+        }
         Command::Doctor {
             verify,
             fix,
@@ -167,6 +210,12 @@ pub fn run() -> Result<()> {
         Command::List { json } => run_list(&sd, json)?,
         Command::Author { name } => run_author(&sd, &name)?,
         Command::Init { url } => run_init(&sd, &url)?,
+        Command::Migrate {
+            old_repo,
+            dry_run,
+            cleanup,
+            json,
+        } => run_migrate(&sd, &old_repo, dry_run, cleanup, json)?,
     }
     Ok(())
 }
@@ -179,6 +228,73 @@ fn run_init(sd: &Skilldock, url: &str) -> Result<()> {
         outcome.synced.cloned.len()
     );
     Ok(())
+}
+
+fn run_migrate(
+    sd: &Skilldock,
+    old_repo: &str,
+    dry_run: bool,
+    cleanup: bool,
+    json: bool,
+) -> Result<()> {
+    let outcome = core::migrate(sd, Path::new(old_repo), MigrateOptions { dry_run, cleanup })?;
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&outcome)?);
+    } else {
+        let lede = if outcome.dry_run {
+            "migrate plan (dry run — nothing written)"
+        } else {
+            "migrated"
+        };
+        let skill_count: usize = outcome.lock.repos.iter().map(|r| r.skills.len()).sum();
+        println!(
+            "{lede}: {} vendored repo(s), {skill_count} skill(s), {} authored",
+            outcome.lock.repos.len(),
+            outcome.authored.len()
+        );
+        print_status_line("moved", &outcome, SkillStatus::Moved);
+        print_status_line("unchanged", &outcome, SkillStatus::Unchanged);
+        print_status_line("added", &outcome, SkillStatus::Added);
+        print_status_line("dropped", &outcome, SkillStatus::Dropped);
+        if let Some(backup) = &outcome.backup {
+            println!("backed up old manifests to {}", backup.display());
+        }
+        if outcome.cleaned {
+            println!("removed superseded old manifests");
+        }
+        if let Some(report) = &outcome.doctor {
+            println!(
+                "doctor: {} error(s), {} warning(s)",
+                report.error_count(),
+                report.warning_count()
+            );
+        }
+    }
+
+    // A built dock that doctor flags is not ready for cutover — exit non-zero.
+    if let Some(report) = &outcome.doctor {
+        if report.has_errors() {
+            bail!(
+                "migrate: doctor found {} error(s); resolve before cutover",
+                report.error_count()
+            );
+        }
+    }
+    Ok(())
+}
+
+/// Print the names of skills in a given diff status, if any.
+fn print_status_line(label: &str, outcome: &core::MigrateOutcome, status: SkillStatus) {
+    let names: Vec<&str> = outcome
+        .skills
+        .iter()
+        .filter(|s| s.status == status)
+        .map(|s| s.name.as_str())
+        .collect();
+    if !names.is_empty() {
+        println!("  {label} ({}): {}", names.len(), names.join(", "));
+    }
 }
 
 /// The global consumer, rooted at the user's home (`~/.agents` + `~/.claude`).
@@ -260,6 +376,38 @@ fn run_relink(sd: &Skilldock, consumer: Consumer) -> Result<()> {
         out.repointed.len(),
         out.unchanged.len()
     );
+    Ok(())
+}
+
+fn run_relink_all(sd: &Skilldock) -> Result<()> {
+    let results = core::relink_all(sd)?;
+    if results.is_empty() {
+        println!("no registered projects");
+    }
+    for (dir, out) in &results {
+        println!(
+            "{}: {} repointed, {} already current",
+            dir.display(),
+            out.repointed.len(),
+            out.unchanged.len()
+        );
+    }
+    Ok(())
+}
+
+fn run_prune_all(sd: &Skilldock) -> Result<()> {
+    let results = core::prune_all(sd)?;
+    if results.is_empty() {
+        println!("no registered projects");
+    }
+    for (dir, out) in &results {
+        let dereg = if out.deregistered {
+            " (deregistered)"
+        } else {
+            ""
+        };
+        println!("{}: {} pruned{}", dir.display(), out.pruned.len(), dereg);
+    }
     Ok(())
 }
 

@@ -9,7 +9,9 @@ use crate::skilldock::Skilldock;
 /// The canonical data-repo pre-commit gate `init` installs into the Store:
 /// block a commit while `doctor` finds errors. Held as a string constant (not a
 /// repo file) because a `cargo install`ed binary has no source tree to read.
-const PRE_COMMIT_HOOK: &str = "#!/usr/bin/env sh\n\
+/// Shared with `migrate`, which builds a Store from scratch and installs the
+/// same gate.
+pub(crate) const PRE_COMMIT_HOOK: &str = "#!/usr/bin/env sh\n\
 # skilldock data-repo pre-commit gate: blocks a commit while the dock is\n\
 # inconsistent (doctor exits non-zero on errors). Bypass with --no-verify.\n\
 exec skilldock doctor\n";
@@ -56,8 +58,9 @@ pub fn init(sd: &Skilldock, data_repo_url: &str) -> Result<InitOutcome> {
     Ok(InitOutcome { store, synced })
 }
 
-/// Write the pre-commit gate into the freshly cloned Store's `.git/hooks`.
-fn install_pre_commit_hook(sd: &Skilldock) -> Result<()> {
+/// Write the pre-commit gate into the Store's `.git/hooks` (the repo must
+/// already be a git checkout). Shared by `init` and `migrate`.
+pub(crate) fn install_pre_commit_hook(sd: &Skilldock) -> Result<()> {
     let hooks_dir = sd.store().join(".git/hooks");
     std::fs::create_dir_all(&hooks_dir).map_err(|e| Error::io(&hooks_dir, e))?;
     let hook = hooks_dir.join("pre-commit");

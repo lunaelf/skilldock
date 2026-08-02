@@ -10,7 +10,6 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::consumer::Consumer;
 use crate::error::{Error, Result};
 use crate::expand::expand_skills;
 use crate::hash::hash_dir;
@@ -197,13 +196,8 @@ pub fn doctor(sd: &Skilldock, opts: DoctorOptions) -> Result<Report> {
 /// registered Consumer's links.
 fn reconcile(sd: &Skilldock) -> Result<()> {
     ops::sync::sync(sd)?;
-    for consumer in registry::read(sd)? {
-        if consumer.is_dir() {
-            let consumer = Consumer::Project(consumer);
-            ops::relink::relink(sd, &consumer)?;
-            ops::prune::prune(sd, &consumer)?;
-        }
-    }
+    ops::relink::relink_all(sd)?;
+    ops::prune::prune_all(sd)?;
     Ok(())
 }
 

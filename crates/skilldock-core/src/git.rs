@@ -35,6 +35,18 @@ pub fn clone(url: &str, dest: &Path) -> Result<()> {
     run(&["clone", "--quiet", url, &dest.to_string_lossy()], None).map(|_| ())
 }
 
+/// Initialize a git repository at `dir` (the directory must already exist).
+/// Idempotent — `git init` on an existing repo is harmless.
+pub fn init(dir: &Path) -> Result<()> {
+    run(&["init", "--quiet", &dir.to_string_lossy()], None).map(|_| ())
+}
+
+/// The `git status --porcelain` output of the working tree at `dir` (empty when
+/// the tree is clean). Used by `migrate` to refuse a dirty tree.
+pub fn status_porcelain(dir: &Path) -> Result<String> {
+    run(&["status", "--porcelain"], Some(dir))
+}
+
 /// Fetch all refs into an existing clone at `dir`.
 pub fn fetch(dir: &Path) -> Result<()> {
     run(&["fetch", "--quiet", "--all", "--tags"], Some(dir)).map(|_| ())

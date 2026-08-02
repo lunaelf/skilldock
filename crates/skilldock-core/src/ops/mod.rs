@@ -8,6 +8,7 @@ pub mod doctor;
 pub mod init;
 pub mod link;
 pub mod list;
+pub mod migrate;
 pub mod prune;
 pub mod register;
 pub mod relink;

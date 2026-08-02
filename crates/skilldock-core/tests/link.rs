@@ -7,8 +7,8 @@ use std::path::Path;
 
 use common::{skill_md, GitFixture, TempSkilldock};
 use skilldock_core::{
-    add, author, deregister, link, prune, register, relink, unlink, AddRequest, Consumer,
-    SkillSpec, Source,
+    add, author, deregister, link, prune, prune_all, register, relink, relink_all, unlink,
+    AddRequest, Consumer, SkillSpec, Source,
 };
 
 /// A skilldock with one authored skill (`git-commit`) and one vendored skill
@@ -307,6 +307,79 @@ fn relink_leaves_links_unknown_to_the_model() {
     assert!(out.repointed.is_empty());
     assert!(out.unchanged.is_empty());
     assert_eq!(read_link(&skills.join("stranger")), foreign);
+}
+
+#[test]
+fn relink_all_repoints_every_registered_project() {
+    let sd = setup();
+
+    // Two projects, each with a hand-made stale link the model still knows.
+    let projects: Vec<_> = (0..2).map(|_| tempfile::tempdir().unwrap()).collect();
+    for proj in &projects {
+        let skills = proj.path().join(".agents/skills");
+        std::fs::create_dir_all(&skills).unwrap();
+        let stale = proj.path().join("old-store/git-commit");
+        std::os::unix::fs::symlink(&stale, skills.join("git-commit")).unwrap();
+        register(sd.sd(), proj.path()).unwrap();
+    }
+
+    let results = relink_all(sd.sd()).unwrap();
+    assert_eq!(results.len(), 2, "both registered projects processed");
+    for (_, out) in &results {
+        assert_eq!(out.repointed, vec!["git-commit"]);
+    }
+    for proj in &projects {
+        assert_eq!(
+            read_link(&proj.path().join(".agents/skills/git-commit")),
+            sd.sd().authored_skill_dir("git-commit")
+        );
+    }
+}
+
+#[test]
+fn prune_all_prunes_and_deregisters_across_projects() {
+    let sd = setup();
+
+    // Project A keeps a live link; project B has only a dangling one.
+    let a = tempfile::tempdir().unwrap();
+    let b = tempfile::tempdir().unwrap();
+    link(
+        sd.sd(),
+        &Consumer::project(a.path()),
+        &["git-commit".into(), "grilling".into()],
+        false,
+    )
+    .unwrap();
+    link(
+        sd.sd(),
+        &Consumer::project(b.path()),
+        &["grilling".into()],
+        false,
+    )
+    .unwrap();
+
+    // Break every `grilling` link by dropping the vendored Source clone.
+    std::fs::remove_dir_all(sd.sd().cache_clone_dir("local/test/skills")).unwrap();
+
+    let mut results = prune_all(sd.sd()).unwrap();
+    results.sort_by(|x, y| x.0.cmp(&y.0));
+    assert_eq!(results.len(), 2);
+
+    // A: grilling pruned, git-commit survives → still registered.
+    let a_canon = std::fs::canonicalize(a.path()).unwrap();
+    let (_, a_out) = results.iter().find(|(p, _)| *p == a_canon).unwrap();
+    assert_eq!(a_out.pruned, vec!["grilling"]);
+    assert!(!a_out.deregistered);
+    assert!(a.path().join(".agents/skills/git-commit").exists());
+
+    // B: its only link was dangling → pruned and deregistered.
+    let b_canon = std::fs::canonicalize(b.path()).unwrap();
+    let (_, b_out) = results.iter().find(|(p, _)| *p == b_canon).unwrap();
+    assert_eq!(b_out.pruned, vec!["grilling"]);
+    assert!(b_out.deregistered);
+
+    // Only project A remains registered.
+    assert_eq!(registry_lines(sd.sd()), vec![a_canon.to_string_lossy()]);
 }
 
 #[test]

@@ -147,6 +147,21 @@ pub fn git_head(dir: &Path) -> String {
         .to_string()
 }
 
+/// The `git status --porcelain` output of a working tree (empty when clean).
+pub fn git_status(dir: &Path) -> String {
+    let out = Command::new("git")
+        .args(["status", "--porcelain"])
+        .current_dir(dir)
+        .output()
+        .expect("run git status");
+    assert!(
+        out.status.success(),
+        "git status failed in {}",
+        dir.display()
+    );
+    String::from_utf8(out.stdout).expect("utf8 status")
+}
+
 /// A minimal valid `SKILL.md` body for fixtures.
 pub fn skill_md(name: &str) -> String {
     format!(

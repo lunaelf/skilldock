@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use serde::Serialize;
 
@@ -6,6 +7,7 @@ use crate::consumer::Consumer;
 use crate::error::{Error, Result};
 use crate::linkfs::{self, LinkStatus};
 use crate::linking;
+use crate::registry;
 use crate::resolve;
 use crate::skilldock::Skilldock;
 
@@ -64,4 +66,19 @@ pub fn relink(sd: &Skilldock, consumer: &Consumer) -> Result<RelinkOutcome> {
     outcome.repointed.sort();
     outcome.unchanged.sort();
     Ok(outcome)
+}
+
+/// Re-point every registered project Consumer's links to the current Source
+/// paths — the cross-`links.txt` batch form of [`relink`], used at migrate
+/// cutover and by `doctor --fix`. Registered projects whose directory is gone
+/// are skipped (doctor reports those as `missing-consumer-dir`).
+pub fn relink_all(sd: &Skilldock) -> Result<Vec<(PathBuf, RelinkOutcome)>> {
+    let mut out = Vec::new();
+    for dir in registry::read(sd)? {
+        if dir.is_dir() {
+            let outcome = relink(sd, &Consumer::Project(dir.clone()))?;
+            out.push((dir, outcome));
+        }
+    }
+    Ok(out)
 }
