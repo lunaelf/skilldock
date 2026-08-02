@@ -1,0 +1,576 @@
+//! `skilldock` (alias `sd`) — a thin CLI adapter over `skilldock-core`.
+//!
+//! It resolves the dock from the environment, calls one core operation, and
+//! renders the result. No business logic lives here; both the `skilldock` and
+//! `sd` binaries call [`run`].
+
+use std::path::Path;
+
+use anyhow::{bail, Result};
+use clap::{Parser, Subcommand};
+use skilldock_core::{
+    self as core, AddRequest, Consumer, DoctorOptions, MigrateOptions, Severity, SkillSpec,
+    SkillStatus, Skilldock,
+};
+
+#[derive(Parser)]
+#[command(
+    name = "skilldock",
+    version,
+    about = "Manage your Agent Skills: authored originals and vendored dependencies."
+)]
+struct Cli {
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    /// Declare a vendored source, clone it into the Cache, and pin it.
+    Add {
+        /// Repo: `owner/repo`, `host/owner/repo`, or a git URL.
+        repo: String,
+        /// One or more skill subpaths or globs to vendor from the repo.
+        #[arg(required = true)]
+        skills: Vec<String>,
+        /// Branch or tag to pin (defaults to the repo's default branch).
+        #[arg(long = "ref")]
+        git_ref: Option<String>,
+    },
+    /// Remove a vendored skill or repo from the manifest, lock, and Cache.
+    #[command(visible_alias = "rm")]
+    Remove {
+        /// Skill name(s) or repo identity(ies) to remove.
+        #[arg(required = true)]
+        targets: Vec<String>,
+    },
+    /// Re-resolve declared refs to fresh commits and rewrite the lock + Cache.
+    Update {
+        /// Repo identity(ies) to update; empty updates every declared source.
+        repos: Vec<String>,
+    },
+    /// Reconstruct the Cache to exactly match the lock.
+    Sync,
+    /// Symlink skills into a Consumer (a project, or `-g` for global).
+    Link {
+        /// `<project> <skill>...`, or with `-g` just `<skill>...`.
+        #[arg(required = true, num_args = 1..)]
+        args: Vec<String>,
+        /// Install globally into `~/.agents` and `~/.claude`.
+        #[arg(short, long)]
+        global: bool,
+        /// Replace an existing link that points elsewhere.
+        #[arg(short, long)]
+        force: bool,
+    },
+    /// Remove skills' links from a Consumer.
+    Unlink {
+        /// `<project> <skill>...`, or with `-g` just `<skill>...`.
+        #[arg(required = true, num_args = 1..)]
+        args: Vec<String>,
+        /// Operate on the global (`~/.agents` + `~/.claude`) links.
+        #[arg(short, long)]
+        global: bool,
+    },
+    /// Remove dangling (broken) links from a Consumer.
+    Prune {
+        /// The project path; omit with `-g` or `--all`.
+        consumer: Option<String>,
+        /// Operate on the global links.
+        #[arg(short, long)]
+        global: bool,
+        /// Prune every registered project in `links.txt`.
+        #[arg(long, conflicts_with_all = ["global", "consumer"])]
+        all: bool,
+    },
+    /// Re-point a Consumer's links to their current Source paths.
+    Relink {
+        /// The project path; omit with `-g` or `--all`.
+        consumer: Option<String>,
+        /// Operate on the global links.
+        #[arg(short, long)]
+        global: bool,
+        /// Re-point every registered project in `links.txt`.
+        #[arg(long, conflicts_with_all = ["global", "consumer"])]
+        all: bool,
+    },
+    /// Cross-check the dock's integrity; errors exit non-zero.
+    Doctor {
+        /// Recompute per-skill content hashes (Cache integrity).
+        #[arg(long)]
+        verify: bool,
+        /// Reconcile via sync/relink/prune before reporting.
+        #[arg(long)]
+        fix: bool,
+        /// Skip Consumer-link checks.
+        #[arg(long = "no-consumers")]
+        no_consumers: bool,
+        /// Emit the report as structured JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Add or remove a project in the `links.txt` registry.
+    Register {
+        /// Project path(s) to (de)register.
+        #[arg(required = true)]
+        consumers: Vec<String>,
+        /// Deregister instead of registering.
+        #[arg(short, long)]
+        remove: bool,
+    },
+    /// List skills by provenance (vendored / authored).
+    List {
+        /// Emit structured JSON instead of a human-readable table.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Mark or scaffold an authored skill and record it in the manifest.
+    Author {
+        /// The skill name (a single directory-name component).
+        name: String,
+    },
+    /// Bootstrap a fresh Skilldock: clone the data repo, write config, and sync.
+    Init {
+        /// Git URL of the data repo to clone into `~/.skilldock/store`.
+        url: String,
+    },
+    /// Convert the Bash-era three-manifest repo into the new dock (one-shot).
+    Migrate {
+        /// Path to the old repo holding `skills-lock.json` / `authored.txt` /
+        /// `external.json`.
+        old_repo: String,
+        /// Compute and print the full plan without writing anything.
+        #[arg(long)]
+        dry_run: bool,
+        /// After the built dock passes doctor, remove the old manifest files.
+        #[arg(long)]
+        cleanup: bool,
+        /// Emit the outcome as structured JSON.
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+/// Parse arguments and run the selected command.
+pub fn run() -> Result<()> {
+    let cli = Cli::parse();
+    let sd = Skilldock::from_env()?;
+
+    match cli.command {
+        Command::Add {
+            repo,
+            skills,
+            git_ref,
+        } => run_add(&sd, &repo, skills, git_ref)?,
+        Command::Remove { targets } => run_remove(&sd, &targets)?,
+        Command::Update { repos } => run_update(&sd, &repos)?,
+        Command::Sync => run_sync(&sd)?,
+        Command::Link {
+            args,
+            global,
+            force,
+        } => {
+            let (consumer, skills) = split_consumer_args(global, args)?;
+            run_link(&sd, consumer, &skills, force)?
+        }
+        Command::Unlink { args, global } => {
+            let (consumer, skills) = split_consumer_args(global, args)?;
+            run_unlink(&sd, consumer, &skills)?
+        }
+        // clap's `conflicts_with_all` guarantees `--all` is exclusive of a path/`-g`.
+        Command::Prune {
+            consumer,
+            global,
+            all,
+        } => {
+            if all {
+                run_prune_all(&sd)?
+            } else {
+                run_prune(&sd, make_consumer(global, consumer)?)?
+            }
+        }
+        Command::Relink {
+            consumer,
+            global,
+            all,
+        } => {
+            if all {
+                run_relink_all(&sd)?
+            } else {
+                run_relink(&sd, make_consumer(global, consumer)?)?
+            }
+        }
+        Command::Doctor {
+            verify,
+            fix,
+            no_consumers,
+            json,
+        } => run_doctor(&sd, verify, fix, no_consumers, json)?,
+        Command::Register { consumers, remove } => run_register(&sd, &consumers, remove)?,
+        Command::List { json } => run_list(&sd, json)?,
+        Command::Author { name } => run_author(&sd, &name)?,
+        Command::Init { url } => run_init(&sd, &url)?,
+        Command::Migrate {
+            old_repo,
+            dry_run,
+            cleanup,
+            json,
+        } => run_migrate(&sd, &old_repo, dry_run, cleanup, json)?,
+    }
+    Ok(())
+}
+
+fn run_init(sd: &Skilldock, url: &str) -> Result<()> {
+    let outcome = core::init(sd, url)?;
+    println!(
+        "initialized {} ({} repo(s) synced)",
+        outcome.store.display(),
+        outcome.synced.cloned.len()
+    );
+    Ok(())
+}
+
+fn run_migrate(
+    sd: &Skilldock,
+    old_repo: &str,
+    dry_run: bool,
+    cleanup: bool,
+    json: bool,
+) -> Result<()> {
+    let outcome = core::migrate(sd, Path::new(old_repo), MigrateOptions { dry_run, cleanup })?;
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&outcome)?);
+    } else {
+        let lede = if outcome.dry_run {
+            "migrate plan (dry run — nothing written)"
+        } else {
+            "migrated"
+        };
+        let skill_count: usize = outcome.lock.repos.iter().map(|r| r.skills.len()).sum();
+        println!(
+            "{lede}: {} vendored repo(s), {skill_count} skill(s), {} authored",
+            outcome.lock.repos.len(),
+            outcome.authored.len()
+        );
+        print_status_line("moved", &outcome, SkillStatus::Moved);
+        print_status_line("unchanged", &outcome, SkillStatus::Unchanged);
+        print_status_line("added", &outcome, SkillStatus::Added);
+        print_status_line("dropped", &outcome, SkillStatus::Dropped);
+        if let Some(backup) = &outcome.backup {
+            println!("backed up old manifests to {}", backup.display());
+        }
+        if outcome.cleaned {
+            println!("removed superseded old manifests");
+        }
+        if let Some(report) = &outcome.doctor {
+            println!(
+                "doctor: {} error(s), {} warning(s)",
+                report.error_count(),
+                report.warning_count()
+            );
+        }
+    }
+
+    // A built dock that doctor flags is not ready for cutover — exit non-zero.
+    if let Some(report) = &outcome.doctor {
+        if report.has_errors() {
+            bail!(
+                "migrate: doctor found {} error(s); resolve before cutover",
+                report.error_count()
+            );
+        }
+    }
+    Ok(())
+}
+
+/// Print the names of skills in a given diff status, if any.
+fn print_status_line(label: &str, outcome: &core::MigrateOutcome, status: SkillStatus) {
+    let names: Vec<&str> = outcome
+        .skills
+        .iter()
+        .filter(|s| s.status == status)
+        .map(|s| s.name.as_str())
+        .collect();
+    if !names.is_empty() {
+        println!("  {label} ({}): {}", names.len(), names.join(", "));
+    }
+}
+
+/// The global consumer, rooted at the user's home (`~/.agents` + `~/.claude`).
+fn global_consumer() -> Result<Consumer> {
+    Ok(Consumer::global_from_home()?)
+}
+
+/// Build a [`Consumer`] for prune/relink from `-g` + an optional path.
+/// Existence of a project path is validated by the core op (ADR-0001).
+fn make_consumer(global: bool, consumer: Option<String>) -> Result<Consumer> {
+    match (global, consumer) {
+        (true, Some(_)) => bail!("--global takes no consumer path"),
+        (true, None) => global_consumer(),
+        (false, Some(path)) => Ok(Consumer::project(path)),
+        (false, None) => bail!("need a project path (or use --global)"),
+    }
+}
+
+/// Split a link/unlink positional list into (consumer, skills). With `-g` every
+/// arg is a skill; otherwise the first arg is the project path.
+fn split_consumer_args(global: bool, mut args: Vec<String>) -> Result<(Consumer, Vec<String>)> {
+    if global {
+        Ok((global_consumer()?, args))
+    } else {
+        if args.len() < 2 {
+            bail!("need a project path and at least one skill (or use --global)");
+        }
+        let consumer = Consumer::project(args.remove(0));
+        Ok((consumer, args))
+    }
+}
+
+fn run_link(sd: &Skilldock, consumer: Consumer, skills: &[String], force: bool) -> Result<()> {
+    let out = core::link(sd, &consumer, skills, force)?;
+    for name in &out.linked {
+        println!("linked {name}");
+    }
+    for name in &out.already {
+        println!("already linked {name}");
+    }
+    Ok(())
+}
+
+fn run_unlink(sd: &Skilldock, consumer: Consumer, skills: &[String]) -> Result<()> {
+    let out = core::unlink(sd, &consumer, skills)?;
+    for name in &out.removed {
+        println!("unlinked {name}");
+    }
+    for name in &out.missing {
+        println!("not linked {name}");
+    }
+    if out.deregistered {
+        println!("deregistered (no links left)");
+    }
+    Ok(())
+}
+
+fn run_prune(sd: &Skilldock, consumer: Consumer) -> Result<()> {
+    let out = core::prune(sd, &consumer)?;
+    if out.pruned.is_empty() {
+        println!("no dangling links");
+    }
+    for name in &out.pruned {
+        println!("pruned {name}");
+    }
+    if out.deregistered {
+        println!("deregistered (no links left)");
+    }
+    Ok(())
+}
+
+fn run_relink(sd: &Skilldock, consumer: Consumer) -> Result<()> {
+    let out = core::relink(sd, &consumer)?;
+    for name in &out.repointed {
+        println!("repointed {name}");
+    }
+    println!(
+        "{} repointed, {} already current",
+        out.repointed.len(),
+        out.unchanged.len()
+    );
+    Ok(())
+}
+
+fn run_relink_all(sd: &Skilldock) -> Result<()> {
+    let results = core::relink_all(sd)?;
+    if results.is_empty() {
+        println!("no registered projects");
+    }
+    for (dir, out) in &results {
+        println!(
+            "{}: {} repointed, {} already current",
+            dir.display(),
+            out.repointed.len(),
+            out.unchanged.len()
+        );
+    }
+    Ok(())
+}
+
+fn run_prune_all(sd: &Skilldock) -> Result<()> {
+    let results = core::prune_all(sd)?;
+    if results.is_empty() {
+        println!("no registered projects");
+    }
+    for (dir, out) in &results {
+        let dereg = if out.deregistered {
+            " (deregistered)"
+        } else {
+            ""
+        };
+        println!("{}: {} pruned{}", dir.display(), out.pruned.len(), dereg);
+    }
+    Ok(())
+}
+
+fn run_doctor(
+    sd: &Skilldock,
+    verify: bool,
+    fix: bool,
+    no_consumers: bool,
+    json: bool,
+) -> Result<()> {
+    let report = core::doctor(
+        sd,
+        DoctorOptions {
+            verify,
+            fix,
+            consumers: !no_consumers,
+        },
+    )?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        for f in &report.findings {
+            let tag = match f.severity() {
+                Severity::Error => "error",
+                Severity::Warning => "warn",
+            };
+            println!("[{tag}] {} {} — {}", f.kind.as_str(), f.subject, f.detail);
+        }
+        println!(
+            "{} error(s), {} warning(s)",
+            report.error_count(),
+            report.warning_count()
+        );
+    }
+    if report.has_errors() {
+        // Non-zero exit gates the data repo's pre-commit hook.
+        bail!("doctor found {} error(s)", report.error_count());
+    }
+    Ok(())
+}
+
+fn run_register(sd: &Skilldock, consumers: &[String], remove: bool) -> Result<()> {
+    for c in consumers {
+        let path = Path::new(c);
+        if remove {
+            let done = core::deregister(sd, path)?;
+            println!(
+                "{} {c}",
+                if done {
+                    "deregistered"
+                } else {
+                    "not registered"
+                }
+            );
+        } else {
+            let done = core::register(sd, path)?;
+            println!(
+                "{} {c}",
+                if done {
+                    "registered"
+                } else {
+                    "already registered"
+                }
+            );
+        }
+    }
+    Ok(())
+}
+
+fn run_add(sd: &Skilldock, repo: &str, skills: Vec<String>, git_ref: Option<String>) -> Result<()> {
+    let outcome = core::add(
+        sd,
+        AddRequest {
+            source: core::parse_source(repo)?,
+            git_ref,
+            skills: skills.into_iter().map(SkillSpec::Path).collect(),
+        },
+    )?;
+    println!(
+        "added {} @ {} ({} skill{})",
+        outcome.repo,
+        short_sha(&outcome.resolved),
+        outcome.skills.len(),
+        if outcome.skills.len() == 1 { "" } else { "s" }
+    );
+    for s in &outcome.skills {
+        println!("  {}  {}", s.name, s.path);
+    }
+    Ok(())
+}
+
+fn run_sync(sd: &Skilldock) -> Result<()> {
+    let outcome = core::sync(sd)?;
+    println!(
+        "sync: {} cloned, {} updated",
+        outcome.cloned.len(),
+        outcome.updated.len()
+    );
+    Ok(())
+}
+
+fn run_remove(sd: &Skilldock, targets: &[String]) -> Result<()> {
+    for target in targets {
+        let out = core::remove(sd, target)?;
+        for name in &out.removed {
+            println!("removed {name}");
+        }
+        for repo in &out.pruned_clones {
+            println!("pruned Cache clone {repo}");
+        }
+    }
+    Ok(())
+}
+
+fn run_update(sd: &Skilldock, repos: &[String]) -> Result<()> {
+    let out = core::update(sd, repos)?;
+    if out.repos.is_empty() {
+        println!("nothing to update");
+    }
+    for r in &out.repos {
+        if r.moved {
+            let from = r.from.as_deref().map(short_sha).unwrap_or("(new)");
+            println!("updated {}  {} -> {}", r.repo, from, short_sha(&r.to));
+        } else {
+            println!("up to date {}", r.repo);
+        }
+    }
+    Ok(())
+}
+
+/// The first 12 chars of a commit SHA, for display.
+fn short_sha(sha: &str) -> &str {
+    &sha[..sha.len().min(12)]
+}
+
+fn run_list(sd: &Skilldock, json: bool) -> Result<()> {
+    let listing = core::list(sd)?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&listing)?);
+        return Ok(());
+    }
+
+    println!("authored ({}):", listing.authored.len());
+    for s in &listing.authored {
+        let flag = if s.present { "" } else { "  (missing)" };
+        println!("  {}{}", s.name, flag);
+    }
+    println!("vendored ({}):", listing.vendored.len());
+    for s in &listing.vendored {
+        println!("  {}  {}  {}", s.name, s.repo, &s.resolved);
+    }
+    Ok(())
+}
+
+fn run_author(sd: &Skilldock, name: &str) -> Result<()> {
+    let outcome = core::author(sd, name)?;
+    let what = if outcome.scaffolded {
+        "scaffolded"
+    } else if outcome.already_listed {
+        "already tracked"
+    } else {
+        "marked"
+    };
+    println!("{} {}", what, outcome.name);
+    Ok(())
+}

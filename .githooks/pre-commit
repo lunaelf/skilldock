@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+# skilldock tool-repo pre-commit gate: format-check, lint, and test the Rust
+# workspace (core + cli). Bypass with `git commit --no-verify`.
+#
+# Enable in a fresh clone with:  git config core.hooksPath .githooks
+set -e
+cargo fmt --all --check
+cargo clippy --all-targets -- -D warnings
+cargo test

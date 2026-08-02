@@ -1,0 +1,27 @@
+[package]
+name = "skilldock-cli"
+description = "CLI front-end for skilldock; thin adapter over skilldock-core."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[lib]
+name = "skilldock_cli"
+path = "src/lib.rs"
+
+# Two entrypoints share one implementation: `skilldock` and its short alias `sd`.
+[[bin]]
+name = "skilldock"
+path = "src/bin/skilldock.rs"
+
+[[bin]]
+name = "sd"
+path = "src/bin/sd.rs"
+
+[dependencies]
+skilldock-core.workspace = true
+clap.workspace = true
+anyhow.workspace = true
+serde_json.workspace = true

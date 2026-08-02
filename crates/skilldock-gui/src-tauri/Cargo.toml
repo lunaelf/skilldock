@@ -1,0 +1,27 @@
+[package]
+name = "skilldock-gui"
+description = "Tauri desktop GUI for skilldock; a thin adapter over skilldock-core."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[lib]
+name = "skilldock_gui_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+skilldock-core = { workspace = true, features = ["specta"] }
+serde.workspace = true
+serde_json.workspace = true
+tauri = { version = "2", features = [] }
+specta = { version = "=2.0.0-rc.25", features = ["derive"] }
+specta-typescript = "0.0.12"
+tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
+
+[dev-dependencies]
+tempfile.workspace = true
