@@ -1,3 +1,5 @@
+use serde::Serialize;
+
 use crate::error::{Error, Result};
 use crate::lock::{Lock, LockRepo};
 use crate::manifest::{Manifest, VendoredRepo};
@@ -5,7 +7,8 @@ use crate::skilldock::Skilldock;
 use crate::{cache, source, vendored};
 
 /// One repo's before/after commit under `update`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct RepoUpdate {
     pub repo: String,
     /// The previously locked SHA, if any.
@@ -17,7 +20,8 @@ pub struct RepoUpdate {
 }
 
 /// What `update` did.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct UpdateOutcome {
     pub repos: Vec<RepoUpdate>,
 }

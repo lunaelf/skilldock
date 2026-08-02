@@ -9,6 +9,8 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::error::{Error, Result};
+
 /// Where linked skills are installed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Consumer {
@@ -22,6 +24,16 @@ impl Consumer {
     /// A project consumer at `dir`.
     pub fn project(dir: impl Into<PathBuf>) -> Self {
         Consumer::Project(dir.into())
+    }
+
+    /// The global consumer, rooted at the user's home (`~/.agents` + `~/.claude`).
+    /// The one place the global tree layout lives, shared by the CLI and GUI.
+    pub fn global_from_home() -> Result<Self> {
+        let home = dirs::home_dir().ok_or(Error::NoHome)?;
+        Ok(Consumer::Global {
+            agents: home.join(".agents"),
+            claude: home.join(".claude"),
+        })
     }
 
     /// The directories that hold per-skill links (one for a project, two global).

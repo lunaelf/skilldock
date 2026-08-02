@@ -1,3 +1,5 @@
+use serde::Serialize;
+
 use crate::consumer::Consumer;
 use crate::error::{Error, Result};
 use crate::linkfs;
@@ -5,7 +7,8 @@ use crate::linking;
 use crate::skilldock::Skilldock;
 
 /// What `prune` did.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct PruneOutcome {
     /// Dangling link names that were removed.
     pub pruned: Vec<String>,

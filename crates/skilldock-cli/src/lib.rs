@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 use skilldock_core::{
     self as core, AddRequest, Consumer, DoctorOptions, Severity, SkillSpec, Skilldock,
@@ -183,11 +183,7 @@ fn run_init(sd: &Skilldock, url: &str) -> Result<()> {
 
 /// The global consumer, rooted at the user's home (`~/.agents` + `~/.claude`).
 fn global_consumer() -> Result<Consumer> {
-    let home = dirs::home_dir().context("could not locate a home directory")?;
-    Ok(Consumer::Global {
-        agents: home.join(".agents"),
-        claude: home.join(".claude"),
-    })
+    Ok(Consumer::global_from_home()?)
 }
 
 /// Build a [`Consumer`] for prune/relink from `-g` + an optional path.

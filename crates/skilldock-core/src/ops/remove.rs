@@ -1,3 +1,5 @@
+use serde::Serialize;
+
 use crate::cache;
 use crate::error::{Error, Result};
 use crate::lock::Lock;
@@ -5,7 +7,8 @@ use crate::manifest::Manifest;
 use crate::skilldock::Skilldock;
 
 /// What `remove` did.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct RemoveOutcome {
     /// The skill name or repo identity removed.
     pub removed: Vec<String>,

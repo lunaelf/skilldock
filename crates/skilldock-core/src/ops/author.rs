@@ -1,9 +1,12 @@
+use serde::Serialize;
+
 use crate::error::{Error, Result};
 use crate::manifest::Manifest;
 use crate::skilldock::Skilldock;
 
 /// What `author` did, so adapters can report it precisely.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct AuthorOutcome {
     pub name: String,
     /// A fresh `SKILL.md` scaffold was written (the skill did not exist).

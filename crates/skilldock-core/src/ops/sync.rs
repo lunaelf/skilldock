@@ -1,10 +1,13 @@
+use serde::Serialize;
+
 use crate::error::Result;
 use crate::lock::Lock;
 use crate::skilldock::Skilldock;
 use crate::{cache, git};
 
 /// What `sync` did to the Cache.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct SyncOutcome {
     /// Repos in the lock that were freshly cloned.
     pub cloned: Vec<String>,

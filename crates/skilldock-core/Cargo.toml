@@ -14,7 +14,7 @@ thiserror.workspace = true
 sha2.workspace = true
 glob.workspace = true
 dirs.workspace = true
-specta = { version = "=2.0.0-rc.25", optional = true }
+specta = { version = "=2.0.0-rc.25", optional = true, features = ["derive"] }
 
 [features]
 # Derive `specta::Type` on the GUI-surfaced public types so they carry across

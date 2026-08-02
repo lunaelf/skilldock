@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use serde::Serialize;
+
 use crate::consumer::Consumer;
 use crate::error::{Error, Result};
 use crate::linkfs::{self, LinkStatus};
@@ -8,7 +10,8 @@ use crate::resolve;
 use crate::skilldock::Skilldock;
 
 /// What `relink` did.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct RelinkOutcome {
     /// Links re-pointed to a new Source path.
     pub repointed: Vec<String>,

@@ -1,3 +1,5 @@
+use serde::Serialize;
+
 use crate::consumer::Consumer;
 use crate::error::{Error, Result};
 use crate::linkfs;
@@ -6,7 +8,8 @@ use crate::resolve;
 use crate::skilldock::Skilldock;
 
 /// What `unlink` did.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct UnlinkOutcome {
     /// Links that were removed.
     pub removed: Vec<String>,

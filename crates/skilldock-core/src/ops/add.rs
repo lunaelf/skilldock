@@ -1,3 +1,5 @@
+use serde::Serialize;
+
 use crate::error::Result;
 use crate::lock::{Lock, LockRepo, LockSkill};
 use crate::manifest::{Manifest, SkillSpec};
@@ -17,7 +19,8 @@ pub struct AddRequest {
 }
 
 /// What `add` resolved.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct AddOutcome {
     pub repo: String,
     /// The pinned commit SHA.

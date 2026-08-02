@@ -21,6 +21,7 @@ use crate::{git, linkfs, ops, registry, resolve};
 
 /// Whether a finding blocks (errors gate commits) or merely informs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
     Error,
@@ -29,6 +30,7 @@ pub enum Severity {
 
 /// The kind of inconsistency found; its [`Severity`] is fixed by the PRD.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(rename_all = "kebab-case")]
 pub enum FindingKind {
     /// A repo/skill declared in toml but absent from the lock.
@@ -95,10 +97,14 @@ impl FindingKind {
     }
 }
 
-/// One inconsistency: what kind, which subject, and a human detail.
+/// One inconsistency: its kind, severity, subject, and a human detail. The
+/// `severity` is serialized (not re-derived by adapters) so the CLI/GUI share
+/// core's single source of truth for the error/warning split.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct Finding {
     pub kind: FindingKind,
+    pub severity: Severity,
     pub subject: String,
     pub detail: String,
 }
@@ -107,18 +113,20 @@ impl Finding {
     fn new(kind: FindingKind, subject: impl Into<String>, detail: impl Into<String>) -> Self {
         Finding {
             kind,
+            severity: kind.severity(),
             subject: subject.into(),
             detail: detail.into(),
         }
     }
 
     pub fn severity(&self) -> Severity {
-        self.kind.severity()
+        self.severity
     }
 }
 
 /// The doctor report.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct Report {
     pub findings: Vec<Finding>,
 }

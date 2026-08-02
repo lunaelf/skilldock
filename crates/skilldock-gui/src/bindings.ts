@@ -6,9 +6,37 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 export const commands = {
 	/**  The dashboard read model: skills grouped by provenance. */
 	getState: () => typedError<Listing, string>(__TAURI_INVOKE("get_state")),
+	add: (repo: string, skills: string[], gitRef: string | null) => typedError<AddOutcome, string>(__TAURI_INVOKE("add", { repo, skills, gitRef })),
+	remove: (target: string) => typedError<RemoveOutcome, string>(__TAURI_INVOKE("remove", { target })),
+	update: (repos: string[]) => typedError<UpdateOutcome, string>(__TAURI_INVOKE("update", { repos })),
+	sync: () => typedError<SyncOutcome, string>(__TAURI_INVOKE("sync")),
+	link: (consumer: ConsumerArg, skills: string[], force: boolean) => typedError<LinkOutcome, string>(__TAURI_INVOKE("link", { consumer, skills, force })),
+	unlink: (consumer: ConsumerArg, skills: string[]) => typedError<UnlinkOutcome, string>(__TAURI_INVOKE("unlink", { consumer, skills })),
+	relink: (consumer: ConsumerArg) => typedError<RelinkOutcome, string>(__TAURI_INVOKE("relink", { consumer })),
+	prune: (consumer: ConsumerArg) => typedError<PruneOutcome, string>(__TAURI_INVOKE("prune", { consumer })),
+	author: (name: string) => typedError<AuthorOutcome, string>(__TAURI_INVOKE("author", { name })),
+	doctor: (verify: boolean, fix: boolean, consumers: boolean) => typedError<Report, string>(__TAURI_INVOKE("doctor", { verify, fix, consumers })),
 };
 
 /* Types */
+/**  What `add` resolved. */
+export type AddOutcome = {
+	repo: string,
+	/**  The pinned commit SHA. */
+	resolved: string,
+	/**  The concrete, hashed skills written to the lock. */
+	skills: LockSkill[],
+};
+
+/**  What `author` did, so adapters can report it precisely. */
+export type AuthorOutcome = {
+	name: string,
+	/**  A fresh `SKILL.md` scaffold was written (the skill did not exist). */
+	scaffolded: boolean,
+	/**  The name was already in the `authored` list before this call. */
+	already_listed: boolean,
+};
+
 /**  An authored skill as seen by `list`. */
 export type AuthoredSkill = {
 	name: string,
@@ -16,10 +44,143 @@ export type AuthoredSkill = {
 	present: boolean,
 };
 
+/**  How the frontend names a Consumer: a project path, or the global config. */
+export type ConsumerArg = { kind: "project"; path: string } | { kind: "global" };
+
+/**
+ *  One inconsistency: its kind, severity, subject, and a human detail. The
+ *  `severity` is serialized (not re-derived by adapters) so the CLI/GUI share
+ *  core's single source of truth for the error/warning split.
+ */
+export type Finding = {
+	kind: FindingKind,
+	severity: Severity,
+	subject: string,
+	detail: string,
+};
+
+/**  The kind of inconsistency found; its [`Severity`] is fixed by the PRD. */
+export type FindingKind = 
+/**  A repo/skill declared in toml but absent from the lock. */
+"declared-but-unlocked" | 
+/**  A repo in the lock but not declared in toml. */
+"stale-lock" | 
+/**  The declaration re-expands to a different skill set than the lock. */
+"glob-drift" | 
+/**  A locked repo has no Cache clone. */
+"missing-clone" | 
+/**  The Cache clone is checked out at a different commit than the lock. */
+"cache-sha-mismatch" | 
+/**  A skill's content hash differs from the lock (`--verify`). */
+"hash-mismatch" | 
+/**  A Cache clone not referenced by the lock. */
+"orphan-clone" | 
+/**  An authored skill declared but missing in the Store. */
+"missing-authored-dir" | 
+/**  A skill dir in the Store not listed in `authored`. */
+"store-orphan" | 
+/**  A skill name provided by more than one source. */
+"name-collision" | 
+/**  A broken Consumer link. */
+"dangling-link" | 
+/**
+ *  A Consumer link to a skill that is no longer linkable (gone from the
+ *  Store and lock).
+ */
+"removed-skill-link" | 
+/**  A registered Consumer whose directory is gone. */
+"missing-consumer-dir" | 
+/**  A registered Consumer with no links. */
+"empty-registration";
+
+/**  What `link` did. */
+export type LinkOutcome = {
+	/**  Skills newly linked (or re-pointed with `force`). */
+	linked: string[],
+	/**  Skills already linked to the same Source. */
+	already: string[],
+};
+
 /**  A skilldock inventory grouped by provenance. */
 export type Listing = {
 	authored: AuthoredSkill[],
 	vendored: VendoredSkill[],
+};
+
+/**  One resolved skill: exact subpath, linked name, and content hash. */
+export type LockSkill = {
+	/**  The name this skill links as. */
+	name: string,
+	/**  The exact subpath within the repo (never a glob). */
+	path: string,
+	/**  Content integrity hash, e.g. `sha256:...`. */
+	hash: string,
+};
+
+/**  What `prune` did. */
+export type PruneOutcome = {
+	/**  Dangling link names that were removed. */
+	pruned: string[],
+	/**  Whether a project was deregistered (pruning emptied it). */
+	deregistered: boolean,
+};
+
+/**  What `relink` did. */
+export type RelinkOutcome = {
+	/**  Links re-pointed to a new Source path. */
+	repointed: string[],
+	/**  Links already pointing at the current Source. */
+	unchanged: string[],
+};
+
+/**  What `remove` did. */
+export type RemoveOutcome = {
+	/**  The skill name or repo identity removed. */
+	removed: string[],
+	/**  Repo identities whose Cache clone was pruned (no longer referenced). */
+	pruned_clones: string[],
+};
+
+/**  One repo's before/after commit under `update`. */
+export type RepoUpdate = {
+	repo: string,
+	/**  The previously locked SHA, if any. */
+	from: string | null,
+	/**  The freshly resolved SHA. */
+	to: string,
+	/**  Whether the commit actually changed. */
+	moved: boolean,
+};
+
+/**  The doctor report. */
+export type Report = {
+	findings: Finding[],
+};
+
+/**  Whether a finding blocks (errors gate commits) or merely informs. */
+export type Severity = "error" | "warning";
+
+/**  What `sync` did to the Cache. */
+export type SyncOutcome = {
+	/**  Repos in the lock that were freshly cloned. */
+	cloned: string[],
+	/**  Repos already present that were (re-)checked-out to the locked SHA. */
+	updated: string[],
+};
+
+/**  What `unlink` did. */
+export type UnlinkOutcome = {
+	/**  Links that were removed. */
+	removed: string[],
+	/**  Names that had no link in this consumer. */
+	missing: string[],
+	/**  Whether the project was deregistered (its last link went away). */
+	deregistered: boolean,
+};
+
+/**  What `update` did. */
+export type UpdateOutcome = {
+	repos: RepoUpdate[],
 };
 
 /**  A vendored skill as seen by `list` (resolved from the lock). */

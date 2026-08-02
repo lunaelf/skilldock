@@ -1,3 +1,5 @@
+use serde::Serialize;
+
 use crate::consumer::Consumer;
 use crate::error::{Error, Result};
 use crate::linkfs::{self, LinkStatus};
@@ -7,7 +9,8 @@ use crate::resolve;
 use crate::skilldock::Skilldock;
 
 /// What `link` did.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct LinkOutcome {
     /// Skills newly linked (or re-pointed with `force`).
     pub linked: Vec<String>,

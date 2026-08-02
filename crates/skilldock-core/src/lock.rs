@@ -47,6 +47,7 @@ impl LockRepo {
 
 /// One resolved skill: exact subpath, linked name, and content hash.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct LockSkill {
     /// The name this skill links as.
     pub name: String,
