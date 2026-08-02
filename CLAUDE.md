@@ -119,3 +119,17 @@ as the existing history shows. There is a `git-commit` skill in this very repo
 `scripts/check.sh` — so commits are blocked while the repo is inconsistent (orphan dirs, stale
 `PACKAGES.md`). After changing skills/manifests, run `gen-packages.sh` or the commit will be
 rejected (bypass with `git commit --no-verify`).
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked as GitHub issues in `lunaelf/skills` via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role vocabulary — `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
