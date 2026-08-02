@@ -102,4 +102,26 @@ impl Manifest {
         self.authored.sort();
         true
     }
+
+    /// Declare a vendored repo: merge into an existing `[[vendored]]` entry for
+    /// `repo` (updating its ref and unioning skills) or append a new one.
+    pub fn declare_vendored(&mut self, repo: &str, git_ref: Option<String>, skills: &[SkillSpec]) {
+        match self.vendored.iter_mut().find(|v| v.repo == repo) {
+            Some(existing) => {
+                if git_ref.is_some() {
+                    existing.git_ref = git_ref;
+                }
+                for spec in skills {
+                    if !existing.skills.contains(spec) {
+                        existing.skills.push(spec.clone());
+                    }
+                }
+            }
+            None => self.vendored.push(VendoredRepo {
+                repo: repo.to_string(),
+                git_ref,
+                skills: skills.to_vec(),
+            }),
+        }
+    }
 }

@@ -5,12 +5,17 @@
 //! explicit [`Skilldock`] rather than reading the environment, so they run
 //! against a throwaway root under test.
 
+mod cache;
 mod error;
+mod expand;
+mod git;
 mod glob;
+mod hash;
 mod lock;
 mod manifest;
 mod ops;
 mod skilldock;
+mod source;
 mod tomlio;
 
 pub use error::{Error, Result};
@@ -18,6 +23,9 @@ pub use glob::is_glob;
 pub use lock::{Lock, LockRepo, LockSkill};
 pub use manifest::{Manifest, SkillSpec, VendoredRepo};
 pub use skilldock::{Skilldock, HOME_ENV};
+pub use source::{parse_source, Source};
 
+pub use ops::add::{add, AddOutcome, AddRequest};
 pub use ops::author::{author, AuthorOutcome};
 pub use ops::list::{list, AuthoredSkill, Listing, VendoredSkill};
+pub use ops::sync::{sync, SyncOutcome};

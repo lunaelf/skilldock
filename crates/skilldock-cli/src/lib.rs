@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use skilldock_core::{self as core, Skilldock};
+use skilldock_core::{self as core, AddRequest, SkillSpec, Skilldock};
 
 #[derive(Parser)]
 #[command(
@@ -21,6 +21,19 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Declare a vendored source, clone it into the Cache, and pin it.
+    Add {
+        /// Repo: `owner/repo`, `host/owner/repo`, or a git URL.
+        repo: String,
+        /// One or more skill subpaths or globs to vendor from the repo.
+        #[arg(required = true)]
+        skills: Vec<String>,
+        /// Branch or tag to pin (defaults to the repo's default branch).
+        #[arg(long = "ref")]
+        git_ref: Option<String>,
+    },
+    /// Reconstruct the Cache to exactly match the lock.
+    Sync,
     /// List skills by provenance (vendored / authored).
     List {
         /// Emit structured JSON instead of a human-readable table.
@@ -40,9 +53,47 @@ pub fn run() -> Result<()> {
     let sd = Skilldock::from_env()?;
 
     match cli.command {
+        Command::Add {
+            repo,
+            skills,
+            git_ref,
+        } => run_add(&sd, &repo, skills, git_ref)?,
+        Command::Sync => run_sync(&sd)?,
         Command::List { json } => run_list(&sd, json)?,
         Command::Author { name } => run_author(&sd, &name)?,
     }
+    Ok(())
+}
+
+fn run_add(sd: &Skilldock, repo: &str, skills: Vec<String>, git_ref: Option<String>) -> Result<()> {
+    let outcome = core::add(
+        sd,
+        AddRequest {
+            source: core::parse_source(repo)?,
+            git_ref,
+            skills: skills.into_iter().map(SkillSpec::Path).collect(),
+        },
+    )?;
+    println!(
+        "added {} @ {} ({} skill{})",
+        outcome.repo,
+        &outcome.resolved[..outcome.resolved.len().min(12)],
+        outcome.skills.len(),
+        if outcome.skills.len() == 1 { "" } else { "s" }
+    );
+    for s in &outcome.skills {
+        println!("  {}  {}", s.name, s.path);
+    }
+    Ok(())
+}
+
+fn run_sync(sd: &Skilldock) -> Result<()> {
+    let outcome = core::sync(sd)?;
+    println!(
+        "sync: {} cloned, {} updated",
+        outcome.cloned.len(),
+        outcome.updated.len()
+    );
     Ok(())
 }
 

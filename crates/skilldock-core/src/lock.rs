@@ -22,6 +22,10 @@ pub struct Lock {
 pub struct LockRepo {
     /// Repo identity, e.g. `github.com/mattpocock/skills`.
     pub repo: String,
+    /// The URL `git clone` fetches from. Recorded so `sync` reproduces the Cache
+    /// from the lock alone, including non-derivable (SSH/mirror/local) sources.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub url: String,
     /// The exact commit SHA every skill from this repo is pinned to.
     pub resolved: String,
     /// Exact, hashed skills resolved from this repo (never globs).
@@ -62,6 +66,14 @@ impl Lock {
     pub fn write(&self, path: &Path) -> Result<()> {
         self.validate()?;
         tomlio::write(self, path)
+    }
+
+    /// Insert `repo`, replacing any existing entry with the same identity
+    /// (a re-resolve), keeping repos sorted by identity for stable output.
+    pub fn upsert_repo(&mut self, repo: LockRepo) {
+        self.repos.retain(|r| r.repo != repo.repo);
+        self.repos.push(repo);
+        self.repos.sort_by(|a, b| a.repo.cmp(&b.repo));
     }
 
     /// The invariant that separates lock from manifest: no path may be a glob.

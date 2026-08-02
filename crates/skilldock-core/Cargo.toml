@@ -11,6 +11,8 @@ repository.workspace = true
 serde.workspace = true
 toml.workspace = true
 thiserror.workspace = true
+sha2.workspace = true
+glob.workspace = true
 dirs.workspace = true
 
 [dev-dependencies]

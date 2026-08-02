@@ -79,18 +79,15 @@ impl GitFixture {
         self.head()
     }
 
+    /// Tag the current `HEAD`.
+    pub fn tag(&self, name: &str) -> &Self {
+        git(&self.path, &["tag", name]);
+        self
+    }
+
     /// The current `HEAD` commit SHA.
     pub fn head(&self) -> String {
-        let out = Command::new("git")
-            .args(["rev-parse", "HEAD"])
-            .current_dir(&self.path)
-            .output()
-            .expect("run git rev-parse");
-        assert!(out.status.success(), "git rev-parse failed");
-        String::from_utf8(out.stdout)
-            .expect("utf8 sha")
-            .trim()
-            .to_string()
+        git_head(&self.path)
     }
 
     pub fn path(&self) -> &Path {
@@ -115,6 +112,24 @@ fn git(dir: &Path, args: &[&str]) {
         args,
         dir.display()
     );
+}
+
+/// The `HEAD` commit SHA of any git working tree (a clone or a fixture).
+pub fn git_head(dir: &Path) -> String {
+    let out = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(dir)
+        .output()
+        .expect("run git rev-parse");
+    assert!(
+        out.status.success(),
+        "git rev-parse failed in {}",
+        dir.display()
+    );
+    String::from_utf8(out.stdout)
+        .expect("utf8 sha")
+        .trim()
+        .to_string()
 }
 
 /// A minimal valid `SKILL.md` body for fixtures.

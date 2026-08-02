@@ -44,6 +44,7 @@ fn vendored_come_from_the_lock() {
     let lock = Lock {
         repos: vec![LockRepo {
             repo: "github.com/mattpocock/skills".into(),
+            url: "https://github.com/mattpocock/skills.git".into(),
             resolved: "a1b2c3d4".into(),
             skills: vec![
                 LockSkill {

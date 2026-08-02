@@ -91,6 +91,7 @@ fn lock_round_trips_exact_entries() {
     let lock = Lock {
         repos: vec![LockRepo {
             repo: "github.com/mattpocock/skills".into(),
+            url: "https://github.com/mattpocock/skills.git".into(),
             resolved: "a1b2c3d4e5f6".into(),
             skills: vec![LockSkill {
                 name: "grilling".into(),
@@ -109,6 +110,7 @@ fn lock_rejects_a_glob_path() {
     let lock = Lock {
         repos: vec![LockRepo {
             repo: "github.com/a/b".into(),
+            url: String::new(),
             resolved: "abc".into(),
             skills: vec![LockSkill {
                 name: "x".into(),

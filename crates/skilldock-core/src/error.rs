@@ -34,6 +34,10 @@ pub enum Error {
     #[error("lock entry '{0}' contains a glob metacharacter; the lock holds only exact paths")]
     GlobInLock(String),
 
+    /// A shelled-out `git` command failed.
+    #[error("git {command} failed: {stderr}")]
+    Git { command: String, stderr: String },
+
     #[error("{0}")]
     Invalid(String),
 }
