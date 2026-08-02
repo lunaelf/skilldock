@@ -1,0 +1,17 @@
+[package]
+name = "skilldock-core"
+description = "Core library for skilldock: the single source of truth for all skill-store operations."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde.workspace = true
+toml.workspace = true
+thiserror.workspace = true
+dirs.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

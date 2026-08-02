@@ -15,6 +15,9 @@ links.txt
 # Skill dev workspaces (eval/benchmark artifacts, not skills themselves)
 .agents/skills/*-workspace/
 
+# Rust (skilldock workspace — rust-rewrite branch)
+/target/
+
 # Python (scripts/ui/server.py)
 __pycache__/
 
