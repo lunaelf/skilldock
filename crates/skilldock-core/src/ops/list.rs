@@ -7,6 +7,7 @@ use crate::skilldock::Skilldock;
 
 /// A skilldock inventory grouped by provenance.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct Listing {
     pub authored: Vec<AuthoredSkill>,
     pub vendored: Vec<VendoredSkill>,
@@ -14,6 +15,7 @@ pub struct Listing {
 
 /// An authored skill as seen by `list`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct AuthoredSkill {
     pub name: String,
     /// Whether the original directory exists in the Store.
@@ -22,6 +24,7 @@ pub struct AuthoredSkill {
 
 /// A vendored skill as seen by `list` (resolved from the lock).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct VendoredSkill {
     pub name: String,
     pub repo: String,

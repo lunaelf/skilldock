@@ -18,6 +18,11 @@ links.txt
 # Rust (skilldock workspace — rust-rewrite branch)
 /target/
 
+# skilldock-gui build artifacts (frontend bundle, deps, tauri codegen)
+crates/skilldock-gui/dist/
+crates/skilldock-gui/node_modules/
+crates/skilldock-gui/src-tauri/gen/
+
 # Python (scripts/ui/server.py)
 __pycache__/
 

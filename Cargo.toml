@@ -1,6 +1,9 @@
 [workspace]
 resolver = "2"
-members = ["crates/skilldock-core", "crates/skilldock-cli"]
+members = ["crates/skilldock-core", "crates/skilldock-cli", "crates/skilldock-gui/src-tauri"]
+# Keep the heavy Tauri build out of the default `cargo build`/`test` inner loop;
+# build the GUI explicitly with `-p skilldock-gui` / `cargo tauri`.
+default-members = ["crates/skilldock-core", "crates/skilldock-cli"]
 
 [workspace.package]
 version = "0.1.0"

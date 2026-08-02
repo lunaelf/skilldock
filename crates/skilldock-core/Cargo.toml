@@ -14,6 +14,12 @@ thiserror.workspace = true
 sha2.workspace = true
 glob.workspace = true
 dirs.workspace = true
+specta = { version = "=2.0.0-rc.25", optional = true }
+
+[features]
+# Derive `specta::Type` on the GUI-surfaced public types so they carry across
+# the Tauri IPC boundary (ADR-0004). Off by default: the CLI/core stay pure.
+specta = ["dep:specta"]
 
 [dev-dependencies]
 tempfile.workspace = true
