@@ -1,20 +1,51 @@
-# macOS
+# ── Rust ───────────────────────────────────────────────────────────────
+# Build output (the workspace shares one target/ at the root, incl. src-tauri).
+/target/
+**/*.rs.bk
+*.pdb
+# Cargo.lock IS committed — this is a binary/app workspace.
+
+# ── skilldock-gui frontend (Vite + React) ──────────────────────────────
+crates/skilldock-gui/dist/
+crates/skilldock-gui/dist-ssr/
+node_modules/
+*.local
+# Committed on purpose: package.json, package-lock.json, vite.config.ts,
+# tsconfig.json, index.html, src/ (incl. src/bindings.ts), icons.
+
+# ── skilldock-gui Tauri codegen ────────────────────────────────────────
+crates/skilldock-gui/src-tauri/gen/
+
+# ── Logs ───────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── Environment / secrets ──────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Local Claude Code settings (personal, not shared) ──────────────────
+.claude/settings.local.json
+
+# ── macOS ──────────────────────────────────────────────────────────────
 .DS_Store
 .AppleDouble
 .LSOverride
+._*
+.Spotlight-V100
+.Trashes
 
-# Local Claude Code settings (personal, not shared)
-.claude/settings.local.json
+# ── Windows ────────────────────────────────────────────────────────────
+Thumbs.db
+ehthumbs.db
 
-# Rust build artifacts
-/target/
-
-# skilldock-gui build artifacts (frontend bundle, deps, tauri codegen)
-crates/skilldock-gui/dist/
-crates/skilldock-gui/node_modules/
-crates/skilldock-gui/src-tauri/gen/
-
-# Editors
+# ── Editors / IDEs ─────────────────────────────────────────────────────
 .idea/
+.vscode/
 *.swp
+*.swo
 *~
