@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+#
+# skilldock data-repo pre-commit gate.
+#
+# Blocks a commit to the data repo (~/.skilldock/store) while the dock is
+# inconsistent — `skilldock doctor` exits non-zero on any error-severity finding
+# (toml<->lock incoherence, glob drift, name collisions, missing authored dir,
+# Store orphan, cache SHA != lock). Warnings do not block.
+#
+# Installed into the data repo by `skilldock init` / `skilldock migrate`
+# (via core.hooksPath -> this file, or a copy into .git/hooks/pre-commit).
+# Bypass a single commit with `git commit --no-verify`.
+
+exec skilldock doctor

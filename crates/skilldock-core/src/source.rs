@@ -32,9 +32,11 @@ pub fn parse_source(arg: &str) -> Result<Source> {
     }
 
     if let Some((_scheme, rest)) = arg.split_once("://") {
-        // scheme://[user@]host/owner/repo(.git)
+        // scheme://[user@]host/owner/repo(.git). Trim both ends so a `file:///abs`
+        // path yields a leading-slash-free identity that round-trips with the
+        // Cache path (`cache/<identity>`); otherwise doctor sees a phantom orphan.
         let rest = rest.split_once('@').map(|(_, r)| r).unwrap_or(rest);
-        let identity = trim_git(rest.trim_end_matches('/'));
+        let identity = trim_git(rest.trim_matches('/'));
         require_triple(identity, arg)?;
         return Ok(Source {
             repo: identity.to_string(),
@@ -140,6 +142,15 @@ mod tests {
                 "git@github.com:mattpocock/skills.git"
             )
         );
+    }
+
+    #[test]
+    fn file_url_identity_has_no_leading_slash() {
+        // The identity must round-trip with the Cache path key (no leading `/`).
+        let s = parse_source("file:///var/tmp/src").unwrap();
+        assert_eq!(s.repo, "var/tmp/src");
+        assert_eq!(s.url, "file:///var/tmp/src");
+        assert!(!s.repo.starts_with('/'));
     }
 
     #[test]

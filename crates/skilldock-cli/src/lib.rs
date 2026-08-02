@@ -8,7 +8,9 @@ use std::path::Path;
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
-use skilldock_core::{self as core, AddRequest, Consumer, SkillSpec, Skilldock};
+use skilldock_core::{
+    self as core, AddRequest, Consumer, DoctorOptions, Severity, SkillSpec, Skilldock,
+};
 
 #[derive(Parser)]
 #[command(
@@ -85,6 +87,21 @@ enum Command {
         #[arg(short, long)]
         global: bool,
     },
+    /// Cross-check the dock's integrity; errors exit non-zero.
+    Doctor {
+        /// Recompute per-skill content hashes (Cache integrity).
+        #[arg(long)]
+        verify: bool,
+        /// Reconcile via sync/relink/prune before reporting.
+        #[arg(long)]
+        fix: bool,
+        /// Skip Consumer-link checks.
+        #[arg(long = "no-consumers")]
+        no_consumers: bool,
+        /// Emit the report as structured JSON.
+        #[arg(long)]
+        json: bool,
+    },
     /// Add or remove a project in the `links.txt` registry.
     Register {
         /// Project path(s) to (de)register.
@@ -135,6 +152,12 @@ pub fn run() -> Result<()> {
         }
         Command::Prune { consumer, global } => run_prune(&sd, make_consumer(global, consumer)?)?,
         Command::Relink { consumer, global } => run_relink(&sd, make_consumer(global, consumer)?)?,
+        Command::Doctor {
+            verify,
+            fix,
+            no_consumers,
+            json,
+        } => run_doctor(&sd, verify, fix, no_consumers, json)?,
         Command::Register { consumers, remove } => run_register(&sd, &consumers, remove)?,
         Command::List { json } => run_list(&sd, json)?,
         Command::Author { name } => run_author(&sd, &name)?,
@@ -225,6 +248,44 @@ fn run_relink(sd: &Skilldock, consumer: Consumer) -> Result<()> {
         out.repointed.len(),
         out.unchanged.len()
     );
+    Ok(())
+}
+
+fn run_doctor(
+    sd: &Skilldock,
+    verify: bool,
+    fix: bool,
+    no_consumers: bool,
+    json: bool,
+) -> Result<()> {
+    let report = core::doctor(
+        sd,
+        DoctorOptions {
+            verify,
+            fix,
+            consumers: !no_consumers,
+        },
+    )?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        for f in &report.findings {
+            let tag = match f.severity() {
+                Severity::Error => "error",
+                Severity::Warning => "warn",
+            };
+            println!("[{tag}] {} {} — {}", f.kind.as_str(), f.subject, f.detail);
+        }
+        println!(
+            "{} error(s), {} warning(s)",
+            report.error_count(),
+            report.warning_count()
+        );
+    }
+    if report.has_errors() {
+        // Non-zero exit gates the data repo's pre-commit hook.
+        bail!("doctor found {} error(s)", report.error_count());
+    }
     Ok(())
 }
 

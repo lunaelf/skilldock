@@ -119,6 +119,11 @@ impl Manifest {
         true
     }
 
+    /// Access a declared vendored repo by identity.
+    pub fn vendored_repo(&self, repo: &str) -> Option<&VendoredRepo> {
+        self.vendored.iter().find(|v| v.repo == repo)
+    }
+
     /// Mutable access to a declared vendored repo by identity.
     pub fn vendored_repo_mut(&mut self, repo: &str) -> Option<&mut VendoredRepo> {
         self.vendored.iter_mut().find(|v| v.repo == repo)

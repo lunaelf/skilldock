@@ -35,6 +35,7 @@ pub use source::{parse_source, Source};
 
 pub use ops::add::{add, AddOutcome, AddRequest};
 pub use ops::author::{author, AuthorOutcome};
+pub use ops::doctor::{doctor, DoctorOptions, Finding, FindingKind, Report, Severity};
 pub use ops::link::{link, LinkOutcome};
 pub use ops::list::{list, AuthoredSkill, Listing, VendoredSkill};
 pub use ops::prune::{prune, PruneOutcome};
