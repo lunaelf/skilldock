@@ -4,5 +4,10 @@
 
 pub mod add;
 pub mod author;
+pub mod link;
 pub mod list;
+pub mod prune;
+pub mod register;
+pub mod relink;
 pub mod sync;
+pub mod unlink;

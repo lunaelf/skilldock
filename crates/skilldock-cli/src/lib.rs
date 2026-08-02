@@ -4,9 +4,11 @@
 //! renders the result. No business logic lives here; both the `skilldock` and
 //! `sd` binaries call [`run`].
 
-use anyhow::Result;
+use std::path::Path;
+
+use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
-use skilldock_core::{self as core, AddRequest, SkillSpec, Skilldock};
+use skilldock_core::{self as core, AddRequest, Consumer, SkillSpec, Skilldock};
 
 #[derive(Parser)]
 #[command(
@@ -34,6 +36,52 @@ enum Command {
     },
     /// Reconstruct the Cache to exactly match the lock.
     Sync,
+    /// Symlink skills into a Consumer (a project, or `-g` for global).
+    Link {
+        /// `<project> <skill>...`, or with `-g` just `<skill>...`.
+        #[arg(required = true, num_args = 1..)]
+        args: Vec<String>,
+        /// Install globally into `~/.agents` and `~/.claude`.
+        #[arg(short, long)]
+        global: bool,
+        /// Replace an existing link that points elsewhere.
+        #[arg(short, long)]
+        force: bool,
+    },
+    /// Remove skills' links from a Consumer.
+    Unlink {
+        /// `<project> <skill>...`, or with `-g` just `<skill>...`.
+        #[arg(required = true, num_args = 1..)]
+        args: Vec<String>,
+        /// Operate on the global (`~/.agents` + `~/.claude`) links.
+        #[arg(short, long)]
+        global: bool,
+    },
+    /// Remove dangling (broken) links from a Consumer.
+    Prune {
+        /// The project path; omit with `-g`.
+        consumer: Option<String>,
+        /// Operate on the global links.
+        #[arg(short, long)]
+        global: bool,
+    },
+    /// Re-point a Consumer's links to their current Source paths.
+    Relink {
+        /// The project path; omit with `-g`.
+        consumer: Option<String>,
+        /// Operate on the global links.
+        #[arg(short, long)]
+        global: bool,
+    },
+    /// Add or remove a project in the `links.txt` registry.
+    Register {
+        /// Project path(s) to (de)register.
+        #[arg(required = true)]
+        consumers: Vec<String>,
+        /// Deregister instead of registering.
+        #[arg(short, long)]
+        remove: bool,
+    },
     /// List skills by provenance (vendored / authored).
     List {
         /// Emit structured JSON instead of a human-readable table.
@@ -59,8 +107,137 @@ pub fn run() -> Result<()> {
             git_ref,
         } => run_add(&sd, &repo, skills, git_ref)?,
         Command::Sync => run_sync(&sd)?,
+        Command::Link {
+            args,
+            global,
+            force,
+        } => {
+            let (consumer, skills) = split_consumer_args(global, args)?;
+            run_link(&sd, consumer, &skills, force)?
+        }
+        Command::Unlink { args, global } => {
+            let (consumer, skills) = split_consumer_args(global, args)?;
+            run_unlink(&sd, consumer, &skills)?
+        }
+        Command::Prune { consumer, global } => run_prune(&sd, make_consumer(global, consumer)?)?,
+        Command::Relink { consumer, global } => run_relink(&sd, make_consumer(global, consumer)?)?,
+        Command::Register { consumers, remove } => run_register(&sd, &consumers, remove)?,
         Command::List { json } => run_list(&sd, json)?,
         Command::Author { name } => run_author(&sd, &name)?,
+    }
+    Ok(())
+}
+
+/// The global consumer, rooted at the user's home (`~/.agents` + `~/.claude`).
+fn global_consumer() -> Result<Consumer> {
+    let home = dirs::home_dir().context("could not locate a home directory")?;
+    Ok(Consumer::Global {
+        agents: home.join(".agents"),
+        claude: home.join(".claude"),
+    })
+}
+
+/// Build a [`Consumer`] for prune/relink from `-g` + an optional path.
+/// Existence of a project path is validated by the core op (ADR-0001).
+fn make_consumer(global: bool, consumer: Option<String>) -> Result<Consumer> {
+    match (global, consumer) {
+        (true, Some(_)) => bail!("--global takes no consumer path"),
+        (true, None) => global_consumer(),
+        (false, Some(path)) => Ok(Consumer::project(path)),
+        (false, None) => bail!("need a project path (or use --global)"),
+    }
+}
+
+/// Split a link/unlink positional list into (consumer, skills). With `-g` every
+/// arg is a skill; otherwise the first arg is the project path.
+fn split_consumer_args(global: bool, mut args: Vec<String>) -> Result<(Consumer, Vec<String>)> {
+    if global {
+        Ok((global_consumer()?, args))
+    } else {
+        if args.len() < 2 {
+            bail!("need a project path and at least one skill (or use --global)");
+        }
+        let consumer = Consumer::project(args.remove(0));
+        Ok((consumer, args))
+    }
+}
+
+fn run_link(sd: &Skilldock, consumer: Consumer, skills: &[String], force: bool) -> Result<()> {
+    let out = core::link(sd, &consumer, skills, force)?;
+    for name in &out.linked {
+        println!("linked {name}");
+    }
+    for name in &out.already {
+        println!("already linked {name}");
+    }
+    Ok(())
+}
+
+fn run_unlink(sd: &Skilldock, consumer: Consumer, skills: &[String]) -> Result<()> {
+    let out = core::unlink(sd, &consumer, skills)?;
+    for name in &out.removed {
+        println!("unlinked {name}");
+    }
+    for name in &out.missing {
+        println!("not linked {name}");
+    }
+    if out.deregistered {
+        println!("deregistered (no links left)");
+    }
+    Ok(())
+}
+
+fn run_prune(sd: &Skilldock, consumer: Consumer) -> Result<()> {
+    let out = core::prune(sd, &consumer)?;
+    if out.pruned.is_empty() {
+        println!("no dangling links");
+    }
+    for name in &out.pruned {
+        println!("pruned {name}");
+    }
+    if out.deregistered {
+        println!("deregistered (no links left)");
+    }
+    Ok(())
+}
+
+fn run_relink(sd: &Skilldock, consumer: Consumer) -> Result<()> {
+    let out = core::relink(sd, &consumer)?;
+    for name in &out.repointed {
+        println!("repointed {name}");
+    }
+    println!(
+        "{} repointed, {} already current",
+        out.repointed.len(),
+        out.unchanged.len()
+    );
+    Ok(())
+}
+
+fn run_register(sd: &Skilldock, consumers: &[String], remove: bool) -> Result<()> {
+    for c in consumers {
+        let path = Path::new(c);
+        if remove {
+            let done = core::deregister(sd, path)?;
+            println!(
+                "{} {c}",
+                if done {
+                    "deregistered"
+                } else {
+                    "not registered"
+                }
+            );
+        } else {
+            let done = core::register(sd, path)?;
+            println!(
+                "{} {c}",
+                if done {
+                    "registered"
+                } else {
+                    "already registered"
+                }
+            );
+        }
     }
     Ok(())
 }

@@ -431,6 +431,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "dirs",
  "serde_json",
  "skilldock-core",
 ]

@@ -63,6 +63,12 @@ impl Skilldock {
         self.root.join("config.toml")
     }
 
+    /// The Consumer registry: absolute paths of projects holding ≥1 link.
+    /// Machine-local (lives in the dock root, outside the Store's git repo).
+    pub fn links_path(&self) -> PathBuf {
+        self.root.join("links.txt")
+    }
+
     /// The declared manifest inside the Store.
     pub fn manifest_path(&self) -> PathBuf {
         self.store().join("skilldock.toml")
