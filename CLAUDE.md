@@ -48,7 +48,9 @@ CONTEXT.md               # domain glossary (the ubiquitous language)
 ```
 
 `default-members` is **core + cli only**, so `cargo build` / `cargo test` skip the heavy Tauri build.
-Build or run the GUI explicitly with `-p skilldock-gui` / `cargo tauri`.
+Run the GUI through its npm Tauri CLI (`cd crates/skilldock-gui && npm run tauri dev`) — the
+`@tauri-apps/cli` devDependency, not the `cargo tauri` subcommand (which needs a separate
+`cargo install tauri-cli`).
 
 ## Commands
 
@@ -58,7 +60,7 @@ cargo fmt --all --check             # formatting gate
 cargo clippy --all-targets -- -D warnings   # lint gate
 cargo install --path crates/skilldock-cli   # install `skilldock` + `sd` to ~/.cargo/bin
 cargo run -p skilldock-gui --example export_bindings   # regenerate the GUI's bindings.ts
-cargo tauri dev            # run the GUI (from crates/skilldock-gui)
+(cd crates/skilldock-gui && npm run tauri dev)         # run the GUI (npm Tauri CLI)
 ```
 
 The installed CLI (`skilldock -h` / `sd -h` on each subcommand):
@@ -94,7 +96,7 @@ migrate                        # one-shot: convert the old Bash three-manifest r
   GUI surfaces derive `serde::Serialize` + feature-gated `specta::Type` (core `specta` feature, off by
   default; the GUI enables it). `bindings.ts` is committed and guarded by the `bindings_are_current`
   test — regenerate it via the `export_bindings` example. All GUI mutations take a single write-lock.
-  The native window can't be verified headlessly; `cargo tauri build` yields an ad-hoc-signed `.app`.
+  The native window can't be verified headlessly; `npm run tauri build` yields an ad-hoc-signed `.app`.
 
 ## Conventions
 

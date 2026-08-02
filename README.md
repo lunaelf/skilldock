@@ -85,6 +85,14 @@ cargo clippy --all-targets -- -D warnings
 git config core.hooksPath .githooks        # enable the pre-commit gate (runs the three above)
 ```
 
-The desktop GUI lives in `crates/skilldock-gui` (Tauri v2 + React/TS) and is built separately:
-`cargo tauri dev` to run, `cargo tauri build` to bundle. See `CLAUDE.md` for the workspace
-conventions and `docs/adr/` for the architecture.
+The desktop GUI lives in `crates/skilldock-gui` (Tauri v2 + React/TS) and is driven through its
+npm Tauri CLI (already a devDependency):
+
+```bash
+cd crates/skilldock-gui
+npm install            # first time only
+npm run tauri dev      # run the app (hot-reloads); npm run tauri build to bundle
+```
+
+(Prefer the `cargo tauri` form? `cargo install tauri-cli --version "^2"`, then `cargo tauri dev`.)
+See `CLAUDE.md` for the workspace conventions and `docs/adr/` for the architecture.
