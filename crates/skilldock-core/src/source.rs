@@ -44,18 +44,24 @@ pub fn parse_source(arg: &str) -> Result<Source> {
 
     // No scheme: a bare identity or shorthand.
     let path = trim_git(arg.trim_matches('/'));
-    let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
-    match segments.len() {
-        2 => Ok(Source {
-            repo: format!("github.com/{path}"),
-            url: format!("https://github.com/{path}.git"),
-        }),
+    let segments = path.split('/').filter(|s| !s.is_empty()).count();
+    match segments {
+        2 => {
+            let repo = format!("github.com/{path}");
+            let url = clone_url_for(&repo);
+            Ok(Source { repo, url })
+        }
         n if n >= 3 => Ok(Source {
+            url: clone_url_for(path),
             repo: path.to_string(),
-            url: format!("https://{path}.git"),
         }),
         _ => Err(bad(arg)),
     }
+}
+
+/// The HTTPS clone URL implied by a repo identity (`host/owner/repo`).
+pub fn clone_url_for(identity: &str) -> String {
+    format!("https://{identity}.git")
 }
 
 /// Strip a trailing `.git` suffix.

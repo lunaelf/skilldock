@@ -33,6 +33,18 @@ pub struct LockRepo {
     pub skills: Vec<LockSkill>,
 }
 
+impl LockRepo {
+    /// The URL to clone from: the recorded one, or derived from the identity
+    /// when a hand-edited/older lock omitted it.
+    pub fn clone_url(&self) -> String {
+        if self.url.is_empty() {
+            crate::source::clone_url_for(&self.repo)
+        } else {
+            self.url.clone()
+        }
+    }
+}
+
 /// One resolved skill: exact subpath, linked name, and content hash.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LockSkill {
@@ -74,6 +86,40 @@ impl Lock {
         self.repos.retain(|r| r.repo != repo.repo);
         self.repos.push(repo);
         self.repos.sort_by(|a, b| a.repo.cmp(&b.repo));
+    }
+
+    /// Mutable access to a locked repo by identity.
+    pub fn repo_mut(&mut self, repo: &str) -> Option<&mut LockRepo> {
+        self.repos.iter_mut().find(|r| r.repo == repo)
+    }
+
+    /// Drop a locked repo entirely; returns whether it was present.
+    pub fn remove_repo(&mut self, repo: &str) -> bool {
+        let before = self.repos.len();
+        self.repos.retain(|r| r.repo != repo);
+        self.repos.len() < before
+    }
+
+    /// Find the identity of the repo that provides a resolved skill named
+    /// `name`. Returns an error if two repos share that name (ambiguous), and
+    /// `None` if no vendored skill has it.
+    pub fn repo_of_skill(&self, name: &str) -> Result<Option<String>> {
+        let mut owners: Vec<&str> = self
+            .repos
+            .iter()
+            .filter(|r| r.skills.iter().any(|s| s.name == name))
+            .map(|r| r.repo.as_str())
+            .collect();
+        owners.sort();
+        match owners.as_slice() {
+            [] => Ok(None),
+            [one] => Ok(Some((*one).to_string())),
+            many => Err(Error::Invalid(format!(
+                "'{name}' is provided by {} repos ({}); remove by repo identity",
+                many.len(),
+                many.join(", ")
+            ))),
+        }
     }
 
     /// The invariant that separates lock from manifest: no path may be a glob.

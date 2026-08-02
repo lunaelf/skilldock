@@ -34,6 +34,18 @@ enum Command {
         #[arg(long = "ref")]
         git_ref: Option<String>,
     },
+    /// Remove a vendored skill or repo from the manifest, lock, and Cache.
+    #[command(visible_alias = "rm")]
+    Remove {
+        /// Skill name(s) or repo identity(ies) to remove.
+        #[arg(required = true)]
+        targets: Vec<String>,
+    },
+    /// Re-resolve declared refs to fresh commits and rewrite the lock + Cache.
+    Update {
+        /// Repo identity(ies) to update; empty updates every declared source.
+        repos: Vec<String>,
+    },
     /// Reconstruct the Cache to exactly match the lock.
     Sync,
     /// Symlink skills into a Consumer (a project, or `-g` for global).
@@ -106,6 +118,8 @@ pub fn run() -> Result<()> {
             skills,
             git_ref,
         } => run_add(&sd, &repo, skills, git_ref)?,
+        Command::Remove { targets } => run_remove(&sd, &targets)?,
+        Command::Update { repos } => run_update(&sd, &repos)?,
         Command::Sync => run_sync(&sd)?,
         Command::Link {
             args,
@@ -254,7 +268,7 @@ fn run_add(sd: &Skilldock, repo: &str, skills: Vec<String>, git_ref: Option<Stri
     println!(
         "added {} @ {} ({} skill{})",
         outcome.repo,
-        &outcome.resolved[..outcome.resolved.len().min(12)],
+        short_sha(&outcome.resolved),
         outcome.skills.len(),
         if outcome.skills.len() == 1 { "" } else { "s" }
     );
@@ -272,6 +286,40 @@ fn run_sync(sd: &Skilldock) -> Result<()> {
         outcome.updated.len()
     );
     Ok(())
+}
+
+fn run_remove(sd: &Skilldock, targets: &[String]) -> Result<()> {
+    for target in targets {
+        let out = core::remove(sd, target)?;
+        for name in &out.removed {
+            println!("removed {name}");
+        }
+        for repo in &out.pruned_clones {
+            println!("pruned Cache clone {repo}");
+        }
+    }
+    Ok(())
+}
+
+fn run_update(sd: &Skilldock, repos: &[String]) -> Result<()> {
+    let out = core::update(sd, repos)?;
+    if out.repos.is_empty() {
+        println!("nothing to update");
+    }
+    for r in &out.repos {
+        if r.moved {
+            let from = r.from.as_deref().map(short_sha).unwrap_or("(new)");
+            println!("updated {}  {} -> {}", r.repo, from, short_sha(&r.to));
+        } else {
+            println!("up to date {}", r.repo);
+        }
+    }
+    Ok(())
+}
+
+/// The first 12 chars of a commit SHA, for display.
+fn short_sha(sha: &str) -> &str {
+    &sha[..sha.len().min(12)]
 }
 
 fn run_list(sd: &Skilldock, json: bool) -> Result<()> {

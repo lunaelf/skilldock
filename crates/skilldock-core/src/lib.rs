@@ -22,6 +22,7 @@ mod resolve;
 mod skilldock;
 mod source;
 mod tomlio;
+mod vendored;
 
 pub use consumer::Consumer;
 pub use error::{Error, Result};
@@ -39,5 +40,7 @@ pub use ops::list::{list, AuthoredSkill, Listing, VendoredSkill};
 pub use ops::prune::{prune, PruneOutcome};
 pub use ops::register::{deregister, register};
 pub use ops::relink::{relink, RelinkOutcome};
+pub use ops::remove::{remove, RemoveOutcome};
 pub use ops::sync::{sync, SyncOutcome};
 pub use ops::unlink::{unlink, UnlinkOutcome};
+pub use ops::update::{update, RepoUpdate, UpdateOutcome};

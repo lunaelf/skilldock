@@ -22,3 +22,13 @@ pub fn ensure_clone(sd: &Skilldock, repo: &str, url: &str) -> Result<(PathBuf, b
     git::clone(url, &dir)?;
     Ok((dir, true))
 }
+
+/// Remove a repo's Cache clone if present. Idempotent.
+pub fn remove_clone(sd: &Skilldock, repo: &str) -> Result<()> {
+    let dir = sd.cache_clone_dir(repo);
+    match std::fs::remove_dir_all(&dir) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(Error::io(&dir, e)),
+    }
+}

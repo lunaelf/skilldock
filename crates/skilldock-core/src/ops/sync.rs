@@ -20,7 +20,7 @@ pub fn sync(sd: &Skilldock) -> Result<SyncOutcome> {
     let mut outcome = SyncOutcome::default();
 
     for repo in &lock.repos {
-        let (clone_dir, freshly_cloned) = cache::ensure_clone(sd, &repo.repo, &repo.url)?;
+        let (clone_dir, freshly_cloned) = cache::ensure_clone(sd, &repo.repo, &repo.clone_url())?;
         git::checkout(&clone_dir, &repo.resolved)?;
         if freshly_cloned {
             outcome.cloned.push(repo.repo.clone());

@@ -3,7 +3,7 @@ use crate::lock::{Lock, LockRepo, LockSkill};
 use crate::manifest::{Manifest, SkillSpec};
 use crate::skilldock::Skilldock;
 use crate::source::Source;
-use crate::{cache, expand, git};
+use crate::vendored;
 
 /// A request to declare and resolve a vendored source repo.
 #[derive(Debug, Clone)]
@@ -31,20 +31,10 @@ pub struct AddOutcome {
 pub fn add(sd: &Skilldock, req: AddRequest) -> Result<AddOutcome> {
     let Source { repo, url } = &req.source;
 
-    // 1. Ensure a Cache clone, then move it onto the requested ref.
-    let (clone_dir, freshly_cloned) = cache::ensure_clone(sd, repo, url)?;
-    if !freshly_cloned {
-        git::fetch(&clone_dir)?;
-    }
-    if let Some(git_ref) = &req.git_ref {
-        git::checkout(&clone_dir, git_ref)?;
-    }
+    // Clone/refresh the Source, pin it to one commit, and expand its skills.
+    let res = vendored::resolve(sd, repo, url, req.git_ref.as_deref(), &req.skills)?;
 
-    // 2. Pin the whole repo to one commit and expand its skills against it.
-    let resolved = git::rev_parse(&clone_dir, "HEAD")?;
-    let skills = expand::expand_skills(&clone_dir, &req.skills)?;
-
-    // 3. Record the declaration (manifest) and the resolution (lock).
+    // Record the declaration (manifest) and the resolution (lock).
     let mut manifest = Manifest::read(&sd.manifest_path())?;
     manifest.declare_vendored(repo, req.git_ref.clone(), &req.skills);
     manifest.write(&sd.manifest_path())?;
@@ -53,14 +43,14 @@ pub fn add(sd: &Skilldock, req: AddRequest) -> Result<AddOutcome> {
     lock.upsert_repo(LockRepo {
         repo: repo.clone(),
         url: url.clone(),
-        resolved: resolved.clone(),
-        skills: skills.clone(),
+        resolved: res.resolved.clone(),
+        skills: res.skills.clone(),
     });
     lock.write(&sd.lock_path())?;
 
     Ok(AddOutcome {
         repo: repo.clone(),
-        resolved,
-        skills,
+        resolved: res.resolved,
+        skills: res.skills,
     })
 }

@@ -69,6 +69,22 @@ impl SkillSpec {
     pub fn is_glob(&self) -> bool {
         is_glob(self.path())
     }
+
+    /// The determinate name this spec links as: the rename, or the path's
+    /// basename. `None` for a glob (which resolves to many names).
+    pub fn link_name(&self) -> Option<String> {
+        match self {
+            SkillSpec::Named { name, .. } => Some(name.clone()),
+            SkillSpec::Path(p) if !is_glob(p) => Some(
+                p.trim_matches('/')
+                    .rsplit('/')
+                    .next()
+                    .unwrap_or(p)
+                    .to_string(),
+            ),
+            SkillSpec::Path(_) => None,
+        }
+    }
 }
 
 impl Manifest {
@@ -101,6 +117,18 @@ impl Manifest {
         self.authored.push(name.to_string());
         self.authored.sort();
         true
+    }
+
+    /// Mutable access to a declared vendored repo by identity.
+    pub fn vendored_repo_mut(&mut self, repo: &str) -> Option<&mut VendoredRepo> {
+        self.vendored.iter_mut().find(|v| v.repo == repo)
+    }
+
+    /// Drop a declared vendored repo entirely; returns whether it was present.
+    pub fn remove_vendored_repo(&mut self, repo: &str) -> bool {
+        let before = self.vendored.len();
+        self.vendored.retain(|v| v.repo != repo);
+        self.vendored.len() < before
     }
 
     /// Declare a vendored repo: merge into an existing `[[vendored]]` entry for
