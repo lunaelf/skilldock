@@ -6,16 +6,7 @@
 # Local Claude Code settings (personal, not shared)
 .claude/settings.local.json
 
-# Symlink farm npx skills generates so Claude Code sees the store's skills here
-.claude/skills/
-
-# Local registry of projects that linked skills (machine-specific abs paths)
-links.txt
-
-# Skill dev workspaces (eval/benchmark artifacts, not skills themselves)
-.agents/skills/*-workspace/
-
-# Rust (skilldock workspace — rust-rewrite branch)
+# Rust build artifacts
 /target/
 
 # skilldock-gui build artifacts (frontend bundle, deps, tauri codegen)
@@ -23,19 +14,7 @@ crates/skilldock-gui/dist/
 crates/skilldock-gui/node_modules/
 crates/skilldock-gui/src-tauri/gen/
 
-# Python (scripts/ui/server.py)
-__pycache__/
-
-# Node / npx skills
-node_modules/
-npm-debug.log*
-yarn-error.log*
-
 # Editors
 .idea/
 *.swp
 *~
-
-# External skill symlinks (restore via scripts/store/sync-external.sh)
-/.agents/skills/hv-analysis
-/.agents/skills/todoist-cli
