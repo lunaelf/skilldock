@@ -414,6 +414,30 @@ fn link_status_reports_linked_unlinked_and_dangling() {
 }
 
 #[test]
+fn link_status_ignores_global_links_owned_by_another_store() {
+    let sd = setup();
+    let home = tempfile::tempdir().unwrap();
+    let consumer = Consumer::Global {
+        agents: home.path().join(".agents"),
+        claude: home.path().join(".claude"),
+    };
+
+    // A broken link named like a dock skill but pointing into a foreign store —
+    // the shape of a stale, pre-migration global link.
+    let agents_skills = home.path().join(".agents/skills");
+    std::fs::create_dir_all(&agents_skills).unwrap();
+    let foreign = home.path().join("foreign-store/grilling");
+    std::os::unix::fs::symlink(&foreign, agents_skills.join("grilling")).unwrap();
+
+    let status = link_status(sd.sd(), &consumer).unwrap();
+    let by_name: std::collections::BTreeMap<_, _> =
+        status.iter().map(|s| (s.name.as_str(), s.state)).collect();
+    // Not this dock's link → Unlinked, not Dangling; consistent with unlink/prune/
+    // relink, which leave foreign global links alone (a `link --force` reclaims it).
+    assert_eq!(by_name["grilling"], LinkState::Unlinked);
+}
+
+#[test]
 fn link_status_of_a_fresh_consumer_is_all_unlinked() {
     let sd = setup();
     let proj = tempfile::tempdir().unwrap();

@@ -9,6 +9,7 @@ use serde::Serialize;
 use crate::consumer::Consumer;
 use crate::error::Result;
 use crate::linkfs;
+use crate::linking;
 use crate::resolve;
 use crate::skilldock::Skilldock;
 
@@ -45,7 +46,7 @@ pub fn link_status(sd: &Skilldock, consumer: &Consumer) -> Result<Vec<SkillLinkS
     Ok(names
         .into_iter()
         .map(|name| SkillLinkStatus {
-            state: state_of(consumer, &name),
+            state: state_of(sd, consumer, &name),
             name,
         })
         .collect())
@@ -53,15 +54,26 @@ pub fn link_status(sd: &Skilldock, consumer: &Consumer) -> Result<Vec<SkillLinkS
 
 /// A skill is linked if any of its Consumer destinations is a symlink; dangling
 /// if such a symlink is broken. (A project has one destination, global two.)
-fn state_of(consumer: &Consumer, name: &str) -> LinkState {
+///
+/// For a global Consumer, a link this skilldock does not own (its target lies
+/// outside this dock's Cache/Store) is ignored — exactly as `unlink`/`prune`/
+/// `relink` skip it — so the toggle never reports a state the link-family ops
+/// would refuse to act on. Such a link reads as `Unlinked`, and `link` (which is
+/// not ownership-scoped) can reclaim it via a `--force` replace.
+fn state_of(sd: &Skilldock, consumer: &Consumer, name: &str) -> LinkState {
+    let global = matches!(consumer, Consumer::Global { .. });
     let mut linked = false;
     let mut dangling = false;
     for dest in consumer.link_dests(name) {
-        if linkfs::is_symlink(&dest) {
-            linked = true;
-            if linkfs::is_broken_symlink(&dest) {
-                dangling = true;
-            }
+        if !linkfs::is_symlink(&dest) {
+            continue;
+        }
+        if global && !linking::owned_by_skilldock(sd, &dest) {
+            continue;
+        }
+        linked = true;
+        if linkfs::is_broken_symlink(&dest) {
+            dangling = true;
         }
     }
     match (linked, dangling) {
