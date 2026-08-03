@@ -6,6 +6,23 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 export const commands = {
 	/**  The dashboard read model: skills grouped by provenance. */
 	getState: () => typedError<Listing, string>(__TAURI_INVOKE("get_state")),
+	/**
+	 *  The registered project Consumers (the Registry / `links.txt`) as path
+	 *  strings. `Global` is never registered; the frontend adds it as an
+	 *  always-available entry.
+	 */
+	registeredConsumers: () => typedError<string[], string>(__TAURI_INVOKE("registered_consumers")),
+	/**
+	 *  Each dock skill's link state (unlinked / linked / dangling) in `consumer`,
+	 *  for the per-skill Link/Unlink toggle.
+	 */
+	linkStatus: (consumer: ConsumerArg) => typedError<SkillLinkStatus[], string>(__TAURI_INVOKE("link_status", { consumer })),
+	/**
+	 *  The Store directory of an authored skill — the reveal target for "Reveal in
+	 *  Finder". Resolves the dock layout in Rust (ADR-0003), so the frontend never
+	 *  hard-codes dock paths; it just hands the result to the opener plugin.
+	 */
+	authoredSkillDir: (name: string) => typedError<string, string>(__TAURI_INVOKE("authored_skill_dir", { name })),
 	add: (repo: string, skills: string[], gitRef: string | null) => typedError<AddOutcome, string>(__TAURI_INVOKE("add", { repo, skills, gitRef })),
 	remove: (target: string) => typedError<RemoveOutcome, string>(__TAURI_INVOKE("remove", { target })),
 	update: (repos: string[]) => typedError<UpdateOutcome, string>(__TAURI_INVOKE("update", { repos })),
@@ -14,6 +31,16 @@ export const commands = {
 	unlink: (consumer: ConsumerArg, skills: string[]) => typedError<UnlinkOutcome, string>(__TAURI_INVOKE("unlink", { consumer, skills })),
 	relink: (consumer: ConsumerArg) => typedError<RelinkOutcome, string>(__TAURI_INVOKE("relink", { consumer })),
 	prune: (consumer: ConsumerArg) => typedError<PruneOutcome, string>(__TAURI_INVOKE("prune", { consumer })),
+	/**
+	 *  Register a project as a Consumer (adds it to `links.txt`). Errors if the path
+	 *  does not exist. Returns whether it was newly added.
+	 */
+	register: (consumer: string) => typedError<boolean, string>(__TAURI_INVOKE("register", { consumer })),
+	/**
+	 *  Deregister a project Consumer (removes it from `links.txt`); works whether or
+	 *  not the path still exists. Returns whether it was present.
+	 */
+	deregister: (consumer: string) => typedError<boolean, string>(__TAURI_INVOKE("deregister", { consumer })),
 	author: (name: string) => typedError<AuthorOutcome, string>(__TAURI_INVOKE("author", { name })),
 	doctor: (verify: boolean, fix: boolean, consumers: boolean) => typedError<Report, string>(__TAURI_INVOKE("doctor", { verify, fix, consumers })),
 };
@@ -101,6 +128,21 @@ export type LinkOutcome = {
 	already: string[],
 };
 
+/**
+ *  Whether a dock skill is linked into a Consumer, and if so whether the link
+ *  resolves.
+ */
+export type LinkState = 
+/**  No link for this skill in the Consumer. */
+"unlinked" | 
+/**
+ *  Linked and the symlink resolves (not broken). A link that resolves to a
+ *  stale path still reads as `Linked` — re-pointing it is relink's job.
+ */
+"linked" | 
+/**  Linked but the symlink is broken (its Source is gone). */
+"dangling";
+
 /**  A skilldock inventory grouped by provenance. */
 export type Listing = {
 	authored: AuthoredSkill[],
@@ -159,6 +201,12 @@ export type Report = {
 
 /**  Whether a finding blocks (errors gate commits) or merely informs. */
 export type Severity = "error" | "warning";
+
+/**  One dock skill's link state in a given Consumer. */
+export type SkillLinkStatus = {
+	name: string,
+	state: LinkState,
+};
 
 /**  What `sync` did to the Cache. */
 export type SyncOutcome = {

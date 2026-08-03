@@ -6,13 +6,14 @@
 //! Every mutation takes the single write lock first, so only one write touches
 //! the dock at a time ("one write at a time").
 
+use std::path::Path;
 use std::sync::Mutex;
 
 use serde::Deserialize;
 use skilldock_core::{
     self as core, AddOutcome, AddRequest, AuthorOutcome, Consumer, DoctorOptions, LinkOutcome,
-    Listing, PruneOutcome, RelinkOutcome, RemoveOutcome, Report, SkillSpec, Skilldock, Source,
-    SyncOutcome, UnlinkOutcome, UpdateOutcome,
+    Listing, PruneOutcome, RelinkOutcome, RemoveOutcome, Report, SkillLinkStatus, SkillSpec,
+    Skilldock, Source, SyncOutcome, UnlinkOutcome, UpdateOutcome,
 };
 use specta_typescript::Typescript;
 use tauri::State;
@@ -65,6 +66,39 @@ impl ConsumerArg {
 #[specta::specta]
 fn get_state() -> Result<Listing, String> {
     core::list(&skilldock()?).map_err(|e| e.to_string())
+}
+
+/// The registered project Consumers (the Registry / `links.txt`) as path
+/// strings. `Global` is never registered; the frontend adds it as an
+/// always-available entry.
+#[tauri::command]
+#[specta::specta]
+fn registered_consumers() -> Result<Vec<String>, String> {
+    Ok(core::registered_consumers(&skilldock()?)
+        .map_err(|e| e.to_string())?
+        .iter()
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect())
+}
+
+/// Each dock skill's link state (unlinked / linked / dangling) in `consumer`,
+/// for the per-skill Link/Unlink toggle.
+#[tauri::command]
+#[specta::specta]
+fn link_status(consumer: ConsumerArg) -> Result<Vec<SkillLinkStatus>, String> {
+    core::link_status(&skilldock()?, &consumer.resolve()?).map_err(|e| e.to_string())
+}
+
+/// The Store directory of an authored skill — the reveal target for "Reveal in
+/// Finder". Resolves the dock layout in Rust (ADR-0003), so the frontend never
+/// hard-codes dock paths; it just hands the result to the opener plugin.
+#[tauri::command]
+#[specta::specta]
+fn authored_skill_dir(name: String) -> Result<String, String> {
+    Ok(skilldock()?
+        .authored_skill_dir(&name)
+        .to_string_lossy()
+        .into_owned())
 }
 
 // ---- mutations (each takes the write lock) ---------------------------------
@@ -148,6 +182,24 @@ fn prune(state: State<'_, AppState>, consumer: ConsumerArg) -> Result<PruneOutco
     core::prune(&skilldock()?, &consumer.resolve()?).map_err(|e| e.to_string())
 }
 
+/// Register a project as a Consumer (adds it to `links.txt`). Errors if the path
+/// does not exist. Returns whether it was newly added.
+#[tauri::command]
+#[specta::specta]
+fn register(state: State<'_, AppState>, consumer: String) -> Result<bool, String> {
+    let _g = write_guard(&state)?;
+    core::register(&skilldock()?, Path::new(&consumer)).map_err(|e| e.to_string())
+}
+
+/// Deregister a project Consumer (removes it from `links.txt`); works whether or
+/// not the path still exists. Returns whether it was present.
+#[tauri::command]
+#[specta::specta]
+fn deregister(state: State<'_, AppState>, consumer: String) -> Result<bool, String> {
+    let _g = write_guard(&state)?;
+    core::deregister(&skilldock()?, Path::new(&consumer)).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 #[specta::specta]
 fn author(state: State<'_, AppState>, name: String) -> Result<AuthorOutcome, String> {
@@ -180,7 +232,22 @@ fn doctor(
 /// export so they can never disagree.
 fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new().commands(collect_commands![
-        get_state, add, remove, update, sync, link, unlink, relink, prune, author, doctor
+        get_state,
+        registered_consumers,
+        link_status,
+        authored_skill_dir,
+        add,
+        remove,
+        update,
+        sync,
+        link,
+        unlink,
+        relink,
+        prune,
+        register,
+        deregister,
+        author,
+        doctor
     ])
 }
 
@@ -202,6 +269,8 @@ pub fn run() {
         .expect("export TypeScript bindings");
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
