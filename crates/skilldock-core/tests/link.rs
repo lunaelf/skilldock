@@ -7,8 +7,8 @@ use std::path::Path;
 
 use common::{skill_md, GitFixture, TempSkilldock};
 use skilldock_core::{
-    add, author, deregister, link, prune, prune_all, register, relink, relink_all, unlink,
-    AddRequest, Consumer, SkillSpec, Source,
+    add, author, deregister, link, link_status, prune, prune_all, register, relink, relink_all,
+    unlink, AddRequest, Consumer, LinkState, SkillSpec, Source,
 };
 
 /// A skilldock with one authored skill (`git-commit`) and one vendored skill
@@ -380,6 +380,46 @@ fn prune_all_prunes_and_deregisters_across_projects() {
 
     // Only project A remains registered.
     assert_eq!(registry_lines(sd.sd()), vec![a_canon.to_string_lossy()]);
+}
+
+#[test]
+fn link_status_reports_linked_unlinked_and_dangling() {
+    let sd = setup();
+    // A third dock skill we never link, to observe the Unlinked state.
+    author(sd.sd(), "docs").unwrap();
+    let proj = tempfile::tempdir().unwrap();
+    let consumer = Consumer::project(proj.path());
+
+    link(
+        sd.sd(),
+        &consumer,
+        &["git-commit".into(), "grilling".into()],
+        false,
+    )
+    .unwrap();
+
+    // Break the vendored `grilling` link by dropping its Source clone.
+    std::fs::remove_dir_all(sd.sd().cache_clone_dir("local/test/skills")).unwrap();
+
+    let status = link_status(sd.sd(), &consumer).unwrap();
+    // Every dock skill, once each, name-sorted.
+    let names: Vec<_> = status.iter().map(|s| s.name.as_str()).collect();
+    assert_eq!(names, vec!["docs", "git-commit", "grilling"]);
+
+    let by_name: std::collections::BTreeMap<_, _> =
+        status.iter().map(|s| (s.name.as_str(), s.state)).collect();
+    assert_eq!(by_name["git-commit"], LinkState::Linked); // authored Source intact
+    assert_eq!(by_name["grilling"], LinkState::Dangling); // Source removed
+    assert_eq!(by_name["docs"], LinkState::Unlinked); // never linked
+}
+
+#[test]
+fn link_status_of_a_fresh_consumer_is_all_unlinked() {
+    let sd = setup();
+    let proj = tempfile::tempdir().unwrap();
+    let status = link_status(sd.sd(), &Consumer::project(proj.path())).unwrap();
+    assert!(!status.is_empty(), "dock skills are listed");
+    assert!(status.iter().all(|s| s.state == LinkState::Unlinked));
 }
 
 #[test]

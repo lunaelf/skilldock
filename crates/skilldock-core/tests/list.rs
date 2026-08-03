@@ -1,10 +1,13 @@
 //! `list` groups skills by provenance: authored from the manifest (with a
 //! presence flag from the Store), vendored from the resolved lock.
+//!
+//! `registered_consumers` is the Registry read that backs the GUI's Consumers
+//! panel: the registered project paths, `Global` never among them.
 
 mod common;
 
 use common::TempSkilldock;
-use skilldock_core::{list, Lock, LockRepo, LockSkill, Manifest};
+use skilldock_core::{list, register, registered_consumers, Lock, LockRepo, LockSkill, Manifest};
 
 #[test]
 fn empty_dock_lists_nothing() {
@@ -73,4 +76,29 @@ fn vendored_come_from_the_lock() {
     assert_eq!(g.repo, "github.com/mattpocock/skills");
     assert_eq!(g.path, "skills/engineering/grilling");
     assert_eq!(g.resolved, "a1b2c3d4");
+}
+
+#[test]
+fn empty_registry_lists_no_consumers() {
+    let d = TempSkilldock::new();
+    assert!(registered_consumers(d.sd()).unwrap().is_empty());
+}
+
+#[test]
+fn registered_consumers_returns_the_registered_projects() {
+    let d = TempSkilldock::new();
+    let a = tempfile::tempdir().unwrap();
+    let b = tempfile::tempdir().unwrap();
+    register(d.sd(), a.path()).unwrap();
+    register(d.sd(), b.path()).unwrap();
+
+    let consumers = registered_consumers(d.sd()).unwrap();
+    // Canonicalized (register normalizes existing paths) and sorted, as the
+    // registry keeps them.
+    let mut expected = vec![
+        std::fs::canonicalize(a.path()).unwrap(),
+        std::fs::canonicalize(b.path()).unwrap(),
+    ];
+    expected.sort();
+    assert_eq!(consumers, expected);
 }
