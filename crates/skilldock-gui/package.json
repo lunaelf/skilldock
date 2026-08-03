@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "packageManager": "pnpm@10.34.5",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
@@ -33,5 +34,8 @@
     "typescript": "^5.7",
     "vite": "^7",
     "vitest": "^3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
   }
 }

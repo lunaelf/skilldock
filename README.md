@@ -86,12 +86,12 @@ git config core.hooksPath .githooks        # enable the pre-commit gate (runs th
 ```
 
 The desktop GUI lives in `crates/skilldock-gui` (Tauri v2 + React/TS) and is driven through its
-npm Tauri CLI (already a devDependency):
+pnpm Tauri CLI (already a devDependency):
 
 ```bash
 cd crates/skilldock-gui
-npm install            # first time only
-npm run tauri dev      # run the app (hot-reloads); npm run tauri build to bundle
+pnpm install            # first time only
+pnpm tauri dev          # run the app (hot-reloads); pnpm tauri build to bundle
 ```
 
 (Prefer the `cargo tauri` form? `cargo install tauri-cli --version "^2"`, then `cargo tauri dev`.)

@@ -20,9 +20,9 @@ error.
 
 ## Consequences
 
-- The added npm/Vite toolchain is **build-time only** — it is not the runtime Node that ADR-0002
+- The added pnpm/Vite toolchain is **build-time only** — it is not the runtime Node that ADR-0002
   retired, and the shipped app bundles static assets with zero Node at runtime.
 - The JS toolchain is isolated to the `skilldock-gui` crate; `skilldock-cli` and `skilldock-core`
   stay pure Rust with no JS.
 - The existing ~886-line vanilla UI is discarded and rewritten in React.
-- An npm-ecosystem maintenance surface is introduced, confined to the GUI crate.
+- A pnpm/npm-registry maintenance surface is introduced, confined to the GUI crate.

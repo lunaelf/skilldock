@@ -10,7 +10,7 @@ crates/skilldock-gui/dist/
 crates/skilldock-gui/dist-ssr/
 node_modules/
 *.local
-# Committed on purpose: package.json, package-lock.json, vite.config.ts,
+# Committed on purpose: package.json, pnpm-lock.yaml, vite.config.ts,
 # tsconfig.json, index.html, src/ (incl. src/bindings.ts), icons.
 
 # ── skilldock-gui Tauri codegen ────────────────────────────────────────
