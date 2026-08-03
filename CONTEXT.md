@@ -51,6 +51,12 @@ A project's `.agents/skills/` (or the global config dir) that receives skills as
 their Source.
 _Avoid_: target, downstream, project
 
+**Registry**:
+The machine-local set (`links.txt`) of project Consumers that hold at least one link — what
+`register` / `deregister` maintain and what `relink --all` / `prune --all` iterate. Global Consumers
+are never in it.
+_Avoid_: links file, index, catalog
+
 **Link**:
 A symlink from a Consumer to a skill in its Source — a Cache clone for vendored, the Store for
 authored — so updates flow to the Consumer without copying.

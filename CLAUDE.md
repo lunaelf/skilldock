@@ -42,7 +42,8 @@ crates/skilldock-core/   # the library: the model + all ops; no I/O policy beyon
 crates/skilldock-cli/    # the `skilldock` (and `sd`) binary — a thin clap wrapper over core ops
 crates/skilldock-gui/    # Tauri v2 + React/TS desktop app (built separately; see below)
 docs/adr/                # architecture decisions (0001 rewrite, 0002 vendored-as-deps,
-                         #   0003 store split + dock layout, 0004 GUI stack)
+                         #   0003 store split + dock layout, 0004 GUI stack,
+                         #   0005 GUI is the daily-driver surface)
 docs/agents/             # issue tracker, triage labels, domain-doc conventions
 CONTEXT.md               # domain glossary (the ubiquitous language)
 ```
